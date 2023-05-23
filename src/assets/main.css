@@ -1,0 +1,22 @@
+main {
+  margin-top: 56px;
+  padding-bottom: 75px;
+}
+
+.object-marker-static circle {
+  stroke: #1010ff;
+}
+
+.object-marker-static line {
+  stroke: #1010ff;
+}
+
+.object-marker-shared circle {
+  stroke: #ff1010;
+}
+
+.object-marker-shared line {
+  stroke: #ff1010;
+}
+
+
