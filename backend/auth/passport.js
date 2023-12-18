@@ -75,7 +75,7 @@ for( k in StrategyConf ) {
 
 function getCallbackUrl(suffix) {
   var urlPrefix = 'http://localhost:3000/';
-  if( process.env.node_env !== 'development' ) {
+  if( process.env.NODE_ENV !== 'development' ) {
     urlPrefix = process.env.urlprefix;
     if( !urlPrefix ) {
       console.log("urlprefix environment not set!")

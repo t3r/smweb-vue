@@ -1,4 +1,4 @@
-process.env.node_env = process.env.node_env || 'development';
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
 const express = require('express');
 const logger = require('morgan');
@@ -14,7 +14,7 @@ const app = express();
 
 require('./auth/passport.js')(passport);
 
-app.use(logger(process.env.node_env  === 'development' ? 'dev' : 'combined'));
+app.use(logger(process.env.NODE_ENV  === 'development' ? 'dev' : 'combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
