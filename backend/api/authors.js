@@ -11,8 +11,10 @@ async function GetAuthors( options ) {
   const params = [ options.limit, options.offset ]
   const text = pgformat(
     `SELECT au_id, au_name, au_notes,count(mo_id) AS count 
-     FROM fgs_authors,fgs_models 
-     WHERE au_id=mo_author group by au_id 
+     FROM fgs_authors
+     LEFT JOIN fgs_models 
+       ON mo_author=au_id
+     GROUP BY au_id 
      ORDER BY %I %s LIMIT $1 OFFSET $2`,
       options.order, options.desc ? 'desc' : 'asc' );
 
@@ -72,8 +74,10 @@ router.get('/:id', (req, res ) => {
 
   db.query(`
      SELECT au_id, au_name, au_notes,count(mo_id) AS count
-     FROM fgs_authors,fgs_models
-     WHERE au_id=mo_author and au_id=$1 group by au_id`,
+     FROM fgs_authors
+     LEFT JOIN fgs_models 
+       ON mo_author=au_id
+     WHERE au_id=$1 GROUP BY au_id`,
      [ id ] )
   .then( result => {
     if( 0 == result.rows.length )
