@@ -104,6 +104,11 @@ const router = createRouter({
       component: () => import('../views/MapView.vue'),
       props: route => ({ z: route.query.z, lat: route.query.lat, lon: route.query.lon }),
 
+    },
+    {
+      path: '/profile',
+      name: 'Profile',
+      component: () => import('../views/ProfileView.vue'),
     }
   ]
 })
