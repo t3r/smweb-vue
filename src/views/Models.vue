@@ -69,6 +69,7 @@ const modelGroups = SMApi._getModelGroups();
 <template>
   <main class="container-fluid">
     <h1>Models</h1>
+    <p>These are all the models we have. You can <router-link class="link" to="/contrib/model/add">add a new Model here</router-link>.</p>
     <EasyDataTable
         :headers="headers"
         :items="items"

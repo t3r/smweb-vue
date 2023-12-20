@@ -1,4 +1,5 @@
 import { ref, watchEffect, toValue } from 'vue'
+import axios from 'axios';
 
 async function fetchJsonByGet( url ) {
   const response = await fetch( url, { method: "GET" });
@@ -252,5 +253,10 @@ export default class SMApi {
   static async getModelGroup( id ) {
     const modelGroups = await SMApi.getModelGroups();
     return modelGroups.find( e => e.id == id );
+  }
+
+  static async createModel( model ) {
+    const response = await axios.postForm(`${SMApi.BASE_URL}/models`, model);
+    return response;
   }
 }

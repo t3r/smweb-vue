@@ -6,6 +6,11 @@ const db = require('../db.js');
 
 const MultiStream = require('./multistream.js');
 
+const multer  = require('multer');
+
+const storage = multer.memoryStorage()
+const upload = multer({ storage: storage })
+
 async function GetModels( options ) {
   options.order = options.order || 'mo_id';
   options.desc = options.desc || false;
@@ -22,10 +27,10 @@ async function GetModels( options ) {
     params.push( options.author );
   }
   const text = pgformat(
-    `SELECT mo_id,mo_path,mo_name,mo_notes,mo_shared,mo_modified,mo_author,au_name 
-       FROM fgs_models,fgs_authors 
-      WHERE au_id=mo_author ${andShared} 
-   ORDER BY %I %s LIMIT $1 OFFSET $2`, 
+    `SELECT mo_id,mo_path,mo_name,mo_notes,mo_shared,mo_modified,mo_author,au_name
+       FROM fgs_models,fgs_authors
+      WHERE au_id=mo_author ${andShared}
+   ORDER BY %I %s LIMIT $1 OFFSET $2`,
    options.order, options.desc ? 'desc' : 'asc' );
 
   const result = await db.query( text, params );
@@ -73,7 +78,7 @@ router.get('/:id/positions', (req, res ) => {
           gndelev: r.ob_gndelev,
           country: r.ob_country,
         }
-      }) 
+      })
     })
     return res.json(featureCollection)
   })
@@ -96,7 +101,7 @@ router.get('/:id/model.tgz', (req, res ) => {
     if( 0 == result.rows.length )
       return res.status(404).send("model not found");
 
-    if( result.rows[0].mo_modelfile == null ) 
+    if( result.rows[0].mo_modelfile == null )
       return res.status(404).send("no modelfile");
 
     var buf = new Buffer(result.rows[0].mo_modelfile, 'base64');
@@ -126,7 +131,7 @@ router.get('/:id/thumb.jpg', (req, res ) => {
     if( 0 == result.rows.length )
       return res.status(404).send("model not found");
 
-    if( result.rows[0].mo_thumbfile == null ) 
+    if( result.rows[0].mo_thumbfile == null )
       return res.status(404).send("no thumbfile");
 
     const buf = new Buffer.from(result.rows[0].mo_thumbfile, 'base64');
@@ -160,7 +165,7 @@ router.get('/:id', (req, res ) => {
 
   db.query(`
     SELECT mo_id,mo_path,mo_modified,mo_author,mo_name,mo_notes,mo_modelfile,mo_shared,au_name,mg_name
-    FROM fgs_models 
+    FROM fgs_models
     LEFT JOIN fgs_modelgroups ON mo_shared=mg_id
     LEFT JOIN fgs_authors ON mo_author=au_id WHERE mo_id = $1`, [ id ] )
   .then( result => {
@@ -186,7 +191,7 @@ router.get('/:id', (req, res ) => {
 
     streambuf.pipe(
       tar.t({
-        onentry: entry => { 
+        onentry: entry => {
           ret.content.push({
             filename: entry.header.path,
             filesize: entry.header.size,
@@ -250,6 +255,45 @@ router.get('/', (req, res ) => {
     return res.status(500).send("Database Error.");
   })
 
+});
+
+/* create and return 201 with url to new object
+   OR queue and return 202 */
+
+function isAuthor( req ) {
+  return true;
+}
+
+const modelUpload = upload.fields([{
+  name: 'group', maxCount: 1
+}, {
+  name: 'name', maxCount: 1
+}, {
+  name: 'description', maxCount: 1
+}, {
+  name: 'longitude', maxCount: 1
+}, {
+  name: 'latitude', maxCount: 1
+}, {
+  name: 'offset', maxCount: 1
+}, {
+  name: 'heading', maxCount: 1
+}, {
+  name: 'ac3d', maxCount: 1
+}, {
+  name: 'xml', maxCount: 1
+}, {
+  name: 'thumb', maxCount: 1
+}, {
+  name: 'textures[]', maxCount: 8
+}])
+router.post('/', modelUpload, (req, res ) => {
+  console.log("body --->",req.body,"files --->",req.files);
+  if( isAuthor(req) ) {
+    return res.status(201).setHeader("Location",`${req.baseUrl}${req.path}4711`).json({ status: 'ok' });
+  } else {
+    return res.status(202).json({ status: 'queued' });
+  }
 });
 
 module.exports = router;

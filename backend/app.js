@@ -19,11 +19,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-app.use(bodyParser.json({
-  strict : true,
-  limit:'5mb',
-}));
-
 app.use(session({
   store: new pgSession({
     pool : pgPool,
@@ -42,17 +37,20 @@ app.use(session({
 
 app.use(passport.authenticate('session'));
 
+/*
 app.use(bodyParser.json({
   strict : true,
   limit: '5mb',
 }));
-
+*/
+/*
 app.use(function (req, res, next) {
   if( req.isAuthenticated() ) {
     res.set('X-FlightGear-User', JSON.stringify(req.user) );
   }
   next();
 });
+*/
 
 app.use('/api', require('./api/index.js'));
 app.use('/auth', require('./auth/index.js')(passport));
