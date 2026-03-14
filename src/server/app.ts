@@ -1,0 +1,136 @@
+import path from 'node:path'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import express from 'express'
+import cors from 'cors'
+import helmet from 'helmet'
+import morgan from 'morgan'
+import dotenv from 'dotenv'
+import swaggerUi from 'swagger-ui-express'
+import swaggerSpec from './config/swagger.js'
+import apiRoutes from './routes/index.js'
+import authRoutes from './routes/auth.js'
+import { sessionMiddleware } from './config/session.js'
+import passport from './config/passport.js'
+import { sequelize } from './config/database.js'
+import { perIpLimiter, perSessionLimiter } from './middleware/rateLimit.js'
+import { CLIENT_ERROR_MESSAGE } from './utils/dbFallback.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+dotenv.config()
+
+const app = express()
+const PORT = process.env.PORT || 3000
+
+// TRUST_PROXY=1: use X-Forwarded-For / X-Real-IP for req.ip (reverse proxy, API Gateway, …).
+if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1)
+}
+
+const isProduction = process.env.NODE_ENV === 'production'
+const rawOrigin = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173'
+
+function getFrontendOrigin(): string {
+  if (!isProduction) {
+    return rawOrigin
+  }
+  const origin = (rawOrigin || '').trim()
+  if (!origin || origin === '*') {
+    throw new Error(
+      'In production, FRONTEND_URL or CLIENT_URL must be set to the exact frontend origin (e.g. https://scenemodels.example.org). ' +
+      'Do not use * or leave it empty.'
+    )
+  }
+  try {
+    const u = new URL(origin)
+    if (!['http:', 'https:'].includes(u.protocol)) {
+      throw new Error('Origin must use http or https')
+    }
+    return u.origin
+  } catch (e) {
+    throw new Error(
+      `Invalid FRONTEND_URL/CLIENT_URL: ${origin}. Use a full origin URL (e.g. https://example.org).`
+    )
+  }
+}
+
+const FRONTEND_ORIGIN = getFrontendOrigin()
+
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
+app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }))
+app.use(morgan('combined'))
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+app.use(sessionMiddleware)
+app.use(passport.initialize())
+app.use(passport.session())
+
+app.use(perIpLimiter)
+app.use(perSessionLimiter)
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+
+app.get('/api/health', async (_req, res) => {
+  try {
+    await sequelize.authenticate()
+    res.json({ status: 'OK', message: 'FlightGear Scenemodels API', database: 'reachable' })
+  } catch {
+    res.status(503).json({
+      status: 'ERROR',
+      message: 'Database unreachable',
+      database: 'unreachable',
+      error: CLIENT_ERROR_MESSAGE,
+    })
+  }
+})
+
+app.use('/api', apiRoutes)
+app.use('/api/auth', authRoutes)
+
+/** Vite `outDir`: dist/public (sibling of dist/server). */
+function getClientDistPath(): string | null {
+  const override = process.env.CLIENT_DIST_PATH?.trim()
+  if (override) return path.isAbsolute(override) ? override : path.resolve(process.cwd(), override)
+  return path.resolve(__dirname, '../public')
+}
+
+if (isProduction) {
+  const clientDist = getClientDistPath()
+  const indexHtml = clientDist ? path.join(clientDist, 'index.html') : ''
+  if (clientDist && fs.existsSync(indexHtml)) {
+    app.use(
+      express.static(clientDist, {
+        index: false,
+        maxAge: '1d',
+        immutable: false,
+      })
+    )
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        next()
+        return
+      }
+      res.sendFile(indexHtml, (err) => {
+        if (err) next(err)
+      })
+    })
+  } else {
+    console.warn(
+      '[app] Production mode: no SPA found at',
+      indexHtml || clientDist,
+      '(set CLIENT_DIST_PATH or run vite build with outDir dist/public)'
+    )
+  }
+}
+
+const isMainModule = process.argv[1]?.endsWith('app.js') || process.argv[1]?.endsWith('app.ts')
+if (isMainModule) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`)
+    console.log(`API docs available at http://localhost:${PORT}/api-docs`)
+  })
+}
+
+export { app }

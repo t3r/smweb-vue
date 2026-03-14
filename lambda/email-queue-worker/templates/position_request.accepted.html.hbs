@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
+  <h2>Request accepted</h2>
+  <p>Your FlightGear scenemodels position request has been <strong>accepted</strong> and applied.</p>
+  <table style="border-collapse: collapse;">
+    <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Type</strong></td><td>{{requestType}}</td></tr>
+    <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Reference</strong></td><td><code>{{sig}}</code></td></tr>
+    {{#if comment}}
+    <tr><td style="padding: 0.25rem 1rem 0.25rem 0; vertical-align: top;"><strong>Your comment</strong></td><td>{{comment}}</td></tr>
+    {{/if}}
+  </table>
+  {{#if executeResult}}
+  <p style="margin-top: 1rem;"><strong>Result</strong></p>
+  <pre style="background: #f4f4f5; padding: 0.75rem; overflow: auto; font-size: 0.85rem;">{{json executeResult}}</pre>
+  {{/if}}
+</body>
+</html>

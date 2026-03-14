@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
+  <h2>Request rejected</h2>
+  <p>Your FlightGear scenemodels position request was <strong>not</strong> accepted.</p>
+  <table style="border-collapse: collapse;">
+    <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Type</strong></td><td>{{requestType}}</td></tr>
+    <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Reference</strong></td><td><code>{{sig}}</code></td></tr>
+    {{#if reason}}
+    <tr><td style="padding: 0.25rem 1rem 0.25rem 0; vertical-align: top;"><strong>Reason</strong></td><td>{{reason}}</td></tr>
+    {{/if}}
+    {{#if comment}}
+    <tr><td style="padding: 0.25rem 1rem 0.25rem 0; vertical-align: top;"><strong>Your comment</strong></td><td>{{comment}}</td></tr>
+    {{/if}}
+  </table>
+</body>
+</html>

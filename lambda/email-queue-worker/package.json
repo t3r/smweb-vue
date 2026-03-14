@@ -1,0 +1,15 @@
+{
+  "name": "fg-scenemodels-email-queue-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scheduled Lambda: receive mail-queue messages, render with Handlebars, send via SES, delete on success",
+  "main": "src/handler.mjs",
+  "scripts": {
+    "zip": "rm -f bundle.zip && zip -r bundle.zip package.json src templates node_modules -x '*/.DS_Store'"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.750.0",
+    "handlebars": "^4.7.8"
+  }
+}

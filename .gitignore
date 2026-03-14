@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Build outputs
+dist/
+build/
+
+# Uploads
+uploads/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+googlee7c627d062fa63de.html
+
+.vite/
+*.sw?
+
+# Legacy PHP / static frontend (not used by the Node + Vite stack under src/)
+/*.php
+/classes/
+/css/
+/img/
+/inc/
+/map/
+/rss/
+/submission/
+/svc/
+/view/

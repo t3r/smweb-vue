@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Periodic Lambda — FG scenemodels email queue → SES → delete on success
+
+Parameters:
+  ApiBaseUrl:
+    Type: String
+    Description: Public base URL of the API (no trailing slash), e.g. https://api.example.com
+  EmailQueueBearerToken:
+    Type: String
+    NoEcho: true
+    Description: Must match server EMAIL_QUEUE_BEARER_TOKEN
+  SesFrom:
+    Type: String
+    Description: Verified SES identity (email or domain)
+  NotifyReviewerEmails:
+    Type: String
+    Description: Comma-separated To addresses for position_request.created alerts
+
+Globals:
+  Function:
+    Timeout: 120
+    MemorySize: 256
+    Architectures:
+      - arm64
+
+Resources:
+  EmailQueueWorker:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handler.handler
+      Runtime: nodejs20.x
+      CodeUri: .
+      Events:
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Enabled: true
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: '*'
+      Environment:
+        Variables:
+          API_BASE_URL: !Ref ApiBaseUrl
+          EMAIL_QUEUE_BEARER_TOKEN: !Ref EmailQueueBearerToken
+          SES_FROM: !Ref SesFrom
+          NOTIFY_REVIEWER_EMAILS: !Ref NotifyReviewerEmails
+          QUEUE_BATCH_SIZE: '10'
+          VISIBILITY_TIMEOUT_SEC: '900'
+
+Outputs:
+  FunctionArn:
+    Value: !GetAtt EmailQueueWorker.Arn
