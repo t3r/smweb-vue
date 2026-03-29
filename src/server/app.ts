@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import cors from 'cors'
-import helmet from 'helmet'
+import helmet, { contentSecurityPolicy } from 'helmet'
 import morgan from 'morgan'
 import dotenv from 'dotenv'
 import swaggerUi from 'swagger-ui-express'
@@ -59,7 +59,24 @@ function getFrontendOrigin(): string {
 
 const FRONTEND_ORIGIN = getFrontendOrigin()
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
+const mapTileSources = [
+  'https://tile.openstreetmap.org',
+  'https://demotiles.maplibre.org',
+] as const
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...contentSecurityPolicy.getDefaultDirectives(),
+        'connect-src': ["'self'", ...mapTileSources],
+        'img-src': ["'self'", 'data:', 'blob:', ...mapTileSources],
+        'worker-src': ["'self'", 'blob:'],
+      },
+    },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+)
 app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }))
 app.use(morgan('combined'))
 app.use(express.json())
