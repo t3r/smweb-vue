@@ -74,6 +74,8 @@ app.use(
         'worker-src': ["'self'", 'blob:'],
       },
     },
+    // Helmet default is no-referrer; OSM tile policy requires a Referer on web tile requests.
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 )
