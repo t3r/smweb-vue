@@ -1,6 +1,7 @@
 # FlightGear Scenemodels
 
-Vue 3 + Express + PostgreSQL. Licence: `LICENCE`.
+A web frontend for the FlightGear scenery database
+Vue 3 + Express + PostgreSQL. 
 
 ## Setup
 
