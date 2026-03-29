@@ -1,7 +1,7 @@
 # FlightGear Scenemodels
 
 A web frontend for the FlightGear scenery database.
-Based on Vue 3 + Express + PostgreSQL. 
+Based on Vue 3 + Express + PostgreSQL. .
 
 ## Setup
 
