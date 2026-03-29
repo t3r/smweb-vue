@@ -29,4 +29,4 @@ npm run build   # `dist/server` (tsc) + `dist/public` (Vite)
 npm start       # `node dist/server/app.js`
 ```
 
-Require `NODE_ENV=production`, `FRONTEND_URL` (exact public origin), `SESSION_SECRET` (≥32 characters). Behind a reverse proxy, set `TRUST_PROXY=1` so `req.ip` and cookies use `X-Forwarded-*`. Same host for API and SPA: do not set `VITE_API_URL` (client uses relative `/api/...`). Optional: `CLIENT_DIST_PATH` if the static build is not next to `dist/server`.
+Require `NODE_ENV=production`, `FRONTEND_URL` (exact public origin), `SESSION_SECRET` (≥32 characters). The process listens on `PORT` and binds to `IP` if set, otherwise `::` (IPv6). Behind a reverse proxy, set `TRUST_PROXY=1` so `req.ip` and cookies use `X-Forwarded-*`. Same host for API and SPA: do not set `VITE_API_URL` (client uses relative `/api/...`). Optional: `CLIENT_DIST_PATH` if the static build is not next to `dist/server`.

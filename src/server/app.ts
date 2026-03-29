@@ -23,6 +23,7 @@ dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3000
+const LISTEN_HOST = process.env.IP?.trim() || '::'
 
 // TRUST_PROXY=1: use X-Forwarded-For / X-Real-IP for req.ip (reverse proxy, API Gateway, …).
 if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true') {
@@ -127,9 +128,12 @@ if (isProduction) {
 
 const isMainModule = process.argv[1]?.endsWith('app.js') || process.argv[1]?.endsWith('app.ts')
 if (isMainModule) {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`)
-    console.log(`API docs available at http://localhost:${PORT}/api-docs`)
+  const port = Number(PORT)
+  const listenPort = Number.isFinite(port) && port >= 0 ? port : 3000
+  app.listen(listenPort, LISTEN_HOST, () => {
+    const hostForUrl = LISTEN_HOST.includes(':') ? `[${LISTEN_HOST}]` : LISTEN_HOST
+    console.log(`Server listening on http://${hostForUrl}:${listenPort}`)
+    console.log(`API docs: http://${hostForUrl}:${listenPort}/api-docs`)
   })
 }
 
