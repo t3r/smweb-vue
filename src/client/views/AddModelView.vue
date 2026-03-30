@@ -57,7 +57,7 @@
               <InputText
                 id="add-model-desc"
                 v-model="form.description"
-                maxlength="500"
+                maxlength="100"
                 placeholder="Optional details about the model"
                 class="w-full"
               />
@@ -206,7 +206,7 @@
                   id="add-model-contact-email"
                   v-model="form.contactEmail"
                   type="email"
-                  maxlength="100"
+                  maxlength="50"
                   placeholder="email@example.com"
                   class="w-full full-width"
                 />
@@ -215,7 +215,7 @@
               <InputText
                 id="add-model-comment"
                 v-model="form.comment"
-                maxlength="200"
+                maxlength="100"
                 placeholder="Note for reviewers"
                 class="w-full full-width"
               />

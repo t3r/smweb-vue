@@ -7,6 +7,17 @@ import { buildTarGz } from '../utils/buildTarGz.js'
 import { convertToThumbnailJpeg } from '../utils/thumbnailImage.js'
 import { isStgParseFailure, parseStgObjectLines, STG_MASS_IMPORT_MAX_LINES } from '../utils/stgObjectLines.js'
 import { enqueuePositionRequestCreated } from '../services/emailQueueEnqueue.js'
+import {
+  assertFileSizeUnderLimit,
+  assertFlatUploadFilename,
+  assertModelPathAvailable,
+  normalizeTextFileBuffer,
+  validateAc3dXmlPngNames,
+  validateModelAddFormFields,
+  validateModelFileBuffers,
+  validateModelfileBase64Package,
+  validateThumbnailBase64Input,
+} from '../utils/modelUploadValidation.js'
 
 export async function submitObjectDelete(req: Request, res: Response): Promise<void> {
   try {
@@ -318,12 +329,11 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
     }
     const lat = Number(latitude)
     const lon = Number(longitude)
-    const countryCode = String(country || '').trim().toLowerCase().slice(0, 2)
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !countryCode) {
-      res.status(400).json({ error: 'longitude, latitude, country required' })
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      res.status(400).json({ error: 'longitude and latitude are required and must be numbers' })
       return
     }
-    if (!thumbnailBase64 || !modelfileBase64) {
+    if (!thumbnailBase64 || typeof thumbnailBase64 !== 'string' || !modelfileBase64 || typeof modelfileBase64 !== 'string') {
       res.status(400).json({ error: 'thumbnailBase64 and modelfileBase64 required' })
       return
     }
@@ -337,19 +347,66 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
       return
     }
 
-    let authorIdFinal = authorId != null ? Number(authorId) : null
-    if (authorIdFinal === 1 || authorIdFinal == null) {
-      const an = authorNew as { name?: string; email?: string } | undefined
-      if (an && (an.name || an.email)) {
-        authorIdFinal = 1
-      } else {
-        res.status(400).json({ error: 'authorId or authorNew { name, email } required' })
-        return
+    const rawAid = authorId != null ? Number(authorId) : null
+    const an = authorNew as { name?: string; email?: string } | undefined
+    let authorIdFinal: number
+    let authorNewForValidation: { name: string; email: string } | undefined
+    if (rawAid != null && Number.isInteger(rawAid) && rawAid >= 2 && rawAid <= 999) {
+      authorIdFinal = rawAid
+      authorNewForValidation = undefined
+    } else if (rawAid === 1 || rawAid == null) {
+      authorIdFinal = 1
+      authorNewForValidation = {
+        name: (an?.name || '').trim(),
+        email: (an?.email || '').trim(),
       }
+    } else {
+      res.status(400).json({ error: 'Invalid author selection.' })
+      return
     }
 
+    const filenameTrim = (filename as string).trim()
+    const formErr = await validateModelAddFormFields({
+      name: (name as string).trim(),
+      description: (description || '').toString().trim(),
+      comment: typeof body.comment === 'string' ? body.comment.trim() : '',
+      email,
+      groupId: groupId != null ? Number(groupId) : 1,
+      authorId: authorIdFinal,
+      authorNew: authorNewForValidation,
+      latitudeRaw: String(latitude),
+      longitudeRaw: String(longitude),
+      countryRaw: String(country || '').trim(),
+      offsetRaw: offset != null && offset !== '' ? String(offset) : '',
+      headingRaw: heading != null && heading !== '' ? String(heading) : '0',
+    })
+    if (formErr) {
+      res.status(400).json({ error: formErr })
+      return
+    }
+
+    const pathErr = await assertModelPathAvailable(filenameTrim)
+    if (pathErr) {
+      res.status(400).json({ error: pathErr })
+      return
+    }
+
+    const pkgErr = await validateModelfileBase64Package(modelfileBase64, filenameTrim)
+    if (pkgErr) {
+      res.status(400).json({ error: pkgErr })
+      return
+    }
+
+    const thumbErr = await validateThumbnailBase64Input(thumbnailBase64)
+    if (thumbErr) {
+      res.status(400).json({ error: thumbErr })
+      return
+    }
+
+    const countryCode = String(country || '').trim().toLowerCase().slice(0, 2)
+
     const modelPayload = {
-      filename: (filename as string).trim(),
+      filename: filenameTrim,
       author: authorIdFinal,
       name: (name as string).trim(),
       description: (description || '').toString().trim(),
@@ -370,11 +427,10 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
       model: modelPayload,
       object: objectPayload,
     }
-    const an = authorNew as { name?: string; email?: string } | undefined
-    if (an && (an.name || an.email)) {
+    if (authorIdFinal === 1 && authorNewForValidation) {
       content.author = {
-        name: (an.name || '').trim(),
-        email: (an.email || '').trim(),
+        name: authorNewForValidation.name,
+        email: authorNewForValidation.email,
       }
     }
 
@@ -428,13 +484,6 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
       return
     }
 
-    const lat = Number(body.latitude)
-    const lon = Number(body.longitude)
-    const countryCode = String(body.country || '').trim().toLowerCase().slice(0, 2)
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !countryCode) {
-      res.status(400).json({ error: 'longitude, latitude, country required' })
-      return
-    }
     if (body.gplAccepted !== true && body.gplAccepted !== 'true') {
       res.status(400).json({ error: 'GPL acceptance required' })
       return
@@ -445,50 +494,156 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
       return
     }
 
-    const authorId = body.authorId != null ? Number(body.authorId) : null
-    const authorNew =
-      authorId === 1 || authorId == null
-        ? (body.authorName != null || body.authorEmail != null
-            ? { name: String(body.authorName || '').trim(), email: String(body.authorEmail || '').trim() }
-            : undefined)
-        : undefined
-    if (authorId !== 1 && (authorId == null || !Number.isFinite(authorId))) {
-      res.status(400).json({ error: 'authorId or (authorName and authorEmail) required' })
+    const thumb = thumbnailFiles[0]!
+    let err = assertFileSizeUnderLimit(thumb.size, 'Thumbnail')
+    if (err) {
+      res.status(400).json({ error: err })
       return
     }
-    if (authorId === 1 && (!authorNew || (!authorNew.name && !authorNew.email))) {
-      res.status(400).json({ error: 'When author is "Other", author name and email are required' })
+    const thumbFlat = assertFlatUploadFilename(thumb.originalname)
+    if (!thumbFlat) {
+      res.status(400).json({ error: 'Invalid thumbnail file name.' })
       return
     }
 
-    const ac3d = ac3dFiles[0]
-    const xml = xmlFiles?.[0]
-    const pathToUse = xml ? xml.originalname : ac3d.originalname
+    const ac3d = ac3dFiles[0]!
+    err = assertFileSizeUnderLimit(ac3d.size, 'AC3D file')
+    if (err) {
+      res.status(400).json({ error: err })
+      return
+    }
+    const acFlat = assertFlatUploadFilename(ac3d.originalname)
+    if (!acFlat) {
+      res.status(400).json({ error: 'Invalid AC3D file name.' })
+      return
+    }
 
-    const tarEntries: { name: string; buffer: Buffer }[] = [
-      { name: ac3d.originalname, buffer: ac3d.buffer },
-    ]
-    if (xml?.buffer) tarEntries.push({ name: xml.originalname, buffer: xml.buffer })
+    let xmlFlat: string | null = null
+    let xmlFile: Express.Multer.File | undefined
+    if (xmlFiles?.[0]?.buffer) {
+      xmlFile = xmlFiles[0]
+      err = assertFileSizeUnderLimit(xmlFile.size, 'XML file')
+      if (err) {
+        res.status(400).json({ error: err })
+        return
+      }
+      const xf = assertFlatUploadFilename(xmlFile.originalname)
+      if (!xf) {
+        res.status(400).json({ error: 'Invalid XML file name.' })
+        return
+      }
+      xmlFlat = xf
+    }
+
+    const pngBuffers: { name: string; buffer: Buffer }[] = []
+    const pngNames: string[] = []
     if (pngFiles?.length) {
       for (const f of pngFiles) {
-        if (f?.buffer) tarEntries.push({ name: f.originalname, buffer: f.buffer })
+        if (!f?.buffer) continue
+        err = assertFileSizeUnderLimit(f.size, `Texture "${f.originalname}"`)
+        if (err) {
+          res.status(400).json({ error: err })
+          return
+        }
+        const pf = assertFlatUploadFilename(f.originalname)
+        if (!pf) {
+          res.status(400).json({ error: `Invalid texture file name: "${f.originalname}".` })
+          return
+        }
+        pngNames.push(pf)
+        pngBuffers.push({ name: pf, buffer: f.buffer })
       }
     }
 
-    const modelfileGzip = await buildTarGz(tarEntries)
-    const modelfileBase64 = modelfileGzip.toString('base64')
-    let thumbnailBase64: string
-    try {
-      const thumbnailJpeg = await convertToThumbnailJpeg(thumbnailFiles[0].buffer)
-      thumbnailBase64 = thumbnailJpeg.toString('base64')
-    } catch (err) {
-      res.status(400).json({ error: 'Invalid thumbnail image; use a valid image file (e.g. JPEG, PNG). It will be converted to 320×240 JPEG.' })
+    const nameRuleErr = validateAc3dXmlPngNames(acFlat, xmlFlat, pngNames)
+    if (nameRuleErr) {
+      res.status(400).json({ error: nameRuleErr })
       return
     }
 
+    const pathToUse = xmlFlat ?? acFlat
+    const pathErr = await assertModelPathAvailable(pathToUse)
+    if (pathErr) {
+      res.status(400).json({ error: pathErr })
+      return
+    }
+
+    const rawAid = body.authorId != null ? Number(body.authorId) : null
+    let authorIdFinal: number
+    let authorNewForValidation: { name: string; email: string } | undefined
+    if (rawAid != null && Number.isInteger(rawAid) && rawAid >= 2 && rawAid <= 999) {
+      authorIdFinal = rawAid
+      authorNewForValidation = undefined
+    } else if (rawAid === 1 || rawAid == null) {
+      authorIdFinal = 1
+      authorNewForValidation = {
+        name: String(body.authorName ?? '').trim(),
+        email: String(body.authorEmail ?? '').trim(),
+      }
+    } else {
+      res.status(400).json({ error: 'Invalid author selection.' })
+      return
+    }
+
+    const formErr = await validateModelAddFormFields({
+      name,
+      description: String(body.description || '').trim(),
+      comment: String(body.comment || '').trim(),
+      email: emailUpload,
+      groupId: body.groupId != null ? Number(body.groupId) : 1,
+      authorId: authorIdFinal,
+      authorNew: authorNewForValidation,
+      latitudeRaw: String(body.latitude ?? ''),
+      longitudeRaw: String(body.longitude ?? ''),
+      countryRaw: String(body.country || '').trim(),
+      offsetRaw: body.offset != null && body.offset !== '' ? String(body.offset) : '',
+      headingRaw: body.heading != null && body.heading !== '' ? String(body.heading) : '0',
+    })
+    if (formErr) {
+      res.status(400).json({ error: formErr })
+      return
+    }
+
+    const lat = Number(body.latitude)
+    const lon = Number(body.longitude)
+    const countryCode = String(body.country || '').trim().toLowerCase().slice(0, 2)
+
+    const acNorm = normalizeTextFileBuffer(ac3d.buffer)
+    const xmlNorm = xmlFile?.buffer ? normalizeTextFileBuffer(xmlFile.buffer) : null
+    const fileErr = await validateModelFileBuffers({
+      acBuffer: acNorm,
+      acFilename: acFlat,
+      xmlBuffer: xmlNorm,
+      xmlFilename: xmlFlat,
+      pngFiles: pngBuffers,
+    })
+    if (fileErr) {
+      res.status(400).json({ error: fileErr })
+      return
+    }
+
+    let thumbnailBase64: string
+    try {
+      const thumbnailJpeg = await convertToThumbnailJpeg(thumb.buffer)
+      thumbnailBase64 = thumbnailJpeg.toString('base64')
+    } catch {
+      res.status(400).json({
+        error:
+          'Invalid thumbnail image; use a valid image file (e.g. JPEG, PNG). It will be converted to 320×240 JPEG.',
+      })
+      return
+    }
+
+    const tarEntries: { name: string; buffer: Buffer }[] = [{ name: acFlat, buffer: acNorm }]
+    if (xmlFlat && xmlNorm) tarEntries.push({ name: xmlFlat, buffer: xmlNorm })
+    for (const p of pngBuffers) tarEntries.push({ name: p.name, buffer: p.buffer })
+
+    const modelfileGzip = await buildTarGz(tarEntries)
+    const modelfileBase64 = modelfileGzip.toString('base64')
+
     const modelPayload = {
       filename: pathToUse,
-      author: authorId === 1 ? 1 : authorId,
+      author: authorIdFinal,
       name,
       description: String(body.description || '').trim(),
       thumbnail: thumbnailBase64,
@@ -508,8 +663,8 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
       model: modelPayload,
       object: objectPayload,
     }
-    if (authorNew && (authorNew.name || authorNew.email)) {
-      content.author = authorNew
+    if (authorNewForValidation && (authorNewForValidation.name || authorNewForValidation.email)) {
+      content.author = authorNewForValidation
     }
 
     const { id, sig } = await requestRepo.saveRequest(
