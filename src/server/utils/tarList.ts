@@ -6,7 +6,7 @@ export interface TarEntry {
 }
 
 export function listTarEntries(buffer: Buffer): TarEntry[] {
-  if (!buffer || buffer.length < 512) return []
+  if (!buffer || buffer.length < 2) return []
   let buf = buffer
   if (buffer[0] === 0x1f && buffer[1] === 0x8b) {
     try {
@@ -15,6 +15,7 @@ export function listTarEntries(buffer: Buffer): TarEntry[] {
       return []
     }
   }
+  if (buf.length < 512) return []
   const entries: TarEntry[] = []
   let offset = 0
   while (offset + 512 <= buf.length) {
@@ -33,14 +34,16 @@ export function listTarEntries(buffer: Buffer): TarEntry[] {
 }
 
 function getTarBuffer(buffer: Buffer): Buffer | null {
-  if (!buffer || buffer.length < 512) return null
+  if (!buffer || buffer.length < 2) return null
   if (buffer[0] === 0x1f && buffer[1] === 0x8b) {
     try {
-      return zlib.gunzipSync(buffer)
+      const out = zlib.gunzipSync(buffer)
+      return out.length >= 512 ? out : null
     } catch {
       return null
     }
   }
+  if (buffer.length < 512) return null
   return buffer
 }
 

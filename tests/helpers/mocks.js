@@ -109,6 +109,7 @@ vi.mock('../../src/server/services/statisticsService.ts', () => ({
 
 vi.mock('../../src/server/repositories/modelgroupRepository.ts', () => ({
   findAll: vi.fn().mockResolvedValue([{ id: 1, name: 'Static', path: 'Static' }]),
+  existsById: vi.fn().mockImplementation((id) => Promise.resolve(Number(id) === 1)),
 }))
 
 vi.mock('../../src/server/repositories/countryRepository.ts', () => ({
@@ -125,6 +126,11 @@ vi.mock('../../src/server/repositories/modelRepository.ts', () => ({
   findRecent: vi.fn().mockResolvedValue([]),
   insertOne: vi.fn().mockResolvedValue({ id: 1 }),
   updateOne: vi.fn().mockResolvedValue(undefined),
+  findIdByPathBasename: vi.fn().mockResolvedValue(null),
+}))
+
+vi.mock('../../src/server/repositories/emailQueueRepository.ts', () => ({
+  enqueue: vi.fn().mockResolvedValue(1),
 }))
 
 vi.mock('../../src/server/repositories/requestRepository.ts', () => ({
