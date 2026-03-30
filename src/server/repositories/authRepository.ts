@@ -80,7 +80,7 @@ export async function getRoleForAuthor(authorId: number): Promise<string> {
       }
     )) as unknown as { role: string }[]
     const row = rows?.[0]
-    return row?.role && ['user', 'reviewer', 'admin'].includes(row.role) ? row.role : ROLE_USER
+    return row?.role && ['user', 'reviewer', 'tester', 'admin'].includes(row.role) ? row.role : ROLE_USER
   } catch {
     return ROLE_USER
   }
@@ -98,7 +98,7 @@ async function ensureUserRole(authorId: number, role: string): Promise<void> {
   }
 }
 
-const VALID_ROLES = ['user', 'reviewer', 'admin']
+const VALID_ROLES = ['user', 'reviewer', 'tester', 'admin']
 
 export async function setRoleForAuthor(authorId: number, role: string): Promise<void> {
   if (!VALID_ROLES.includes(role)) throw new Error('Invalid role')

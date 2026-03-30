@@ -2,7 +2,7 @@
 
 - **OAuth:** GitHub and GitLab (authorization code). Callbacks: `{API_BASE}/api/auth/github/callback` and `.../gitlab/callback` (`API_BASE` defaults to `http://localhost:PORT`).
 - **Sessions:** PostgreSQL table `user_sessions` (`connect-pg-simple`, same DB as app). `SESSION_STORE=memory` forces in-memory store. In `NODE_ENV=test` without `TEST_USE_REAL_DB=1`, memory is used automatically.
-- **Roles:** `user` | `reviewer` | `admin` in `fgs_user_roles`; new users get `user`. `au_id` = `fgs_authors.au_id` (linked via `fgs_extuserids` after login).
+- **Roles:** `user` | `reviewer` | `tester` | `admin` in `fgs_user_roles`; new users get `user`. `tester` (or admin) is required for POST `/api/submissions/objects`, `/object/delete`, `/object/update`, `/model/delete`, `/models`, `/models/upload`. `au_id` = `fgs_authors.au_id` (linked via `fgs_extuserids` after login).
 
 ## Migration
 

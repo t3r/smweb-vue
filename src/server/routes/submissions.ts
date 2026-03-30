@@ -8,13 +8,15 @@ const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
 router.post('/objects/stg-preview', submissionsController.previewStgObjects)
-router.post('/objects', submissionsController.submitObjects)
-router.post('/object/delete', submissionsController.submitObjectDelete)
-router.post('/object/update', submissionsController.submitObjectUpdate)
-router.post('/model/delete', submissionsController.submitModelDelete)
-router.post('/models', submissionsController.submitModel)
+router.post('/objects', requireAuth, requireRole('tester'), submissionsController.submitObjects)
+router.post('/object/delete', requireAuth, requireRole('tester'), submissionsController.submitObjectDelete)
+router.post('/object/update', requireAuth, requireRole('tester'), submissionsController.submitObjectUpdate)
+router.post('/model/delete', requireAuth, requireRole('tester'), submissionsController.submitModelDelete)
+router.post('/models', requireAuth, requireRole('tester'), submissionsController.submitModel)
 router.post(
   '/models/upload',
+  requireAuth,
+  requireRole('tester'),
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'ac3d', maxCount: 1 },

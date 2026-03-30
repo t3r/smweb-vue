@@ -50,7 +50,7 @@ export async function getAuthor(req: Request, res: Response): Promise<void> {
   }
 }
 
-const VALID_ROLES = new Set(['user', 'reviewer', 'admin'])
+const VALID_ROLES = new Set(['user', 'reviewer', 'tester', 'admin'])
 
 export async function updateAuthorRole(req: Request, res: Response): Promise<void> {
   try {
@@ -61,7 +61,7 @@ export async function updateAuthorRole(req: Request, res: Response): Promise<voi
     }
     const role = (req.body as { role?: string })?.role
     if (!role || typeof role !== 'string' || !VALID_ROLES.has(role)) {
-      res.status(400).json({ error: 'Invalid role; use user, reviewer, or admin' })
+      res.status(400).json({ error: 'Invalid role; use user, reviewer, tester, or admin' })
       return
     }
     await authorService.updateAuthorRole(id, role)
