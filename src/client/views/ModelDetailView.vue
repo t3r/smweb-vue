@@ -133,7 +133,7 @@
         <label for="delete-confirm-id">Model ID</label>
         <InputText id="delete-confirm-id" v-model="deleteConfirmId" placeholder="Enter model ID" class="w-full" />
       </div>
-      <div v-if="!auth.isAuthenticated" class="field">
+      <div v-if="needsContactEmail" class="field">
         <label for="delete-email">Email <span class="required">*</span></label>
         <InputText id="delete-email" v-model="requestEmail" type="email" placeholder="Your email address" class="w-full" />
         <small class="text-secondary">Required to associate this request with your contact.</small>
@@ -251,10 +251,17 @@ const deleteConfirmMatches = computed(() => {
   return String(deleteConfirmId.value).trim() === String(id)
 })
 
-const hasValidEmail = computed(() => {
-  if (auth.isAuthenticated && auth.user?.email) return true
-  return (requestEmail.value || '').trim().length > 0
-})
+/** Signed-in with a non-empty author email — no extra field. */
+const hasSessionContactEmail = computed(
+  () => auth.isAuthenticated && !!(auth.user?.email && String(auth.user.email).trim())
+)
+
+/** Guest or signed-in without email on the author record. */
+const needsContactEmail = computed(() => !hasSessionContactEmail.value)
+
+const hasValidEmail = computed(
+  () => hasSessionContactEmail.value || (requestEmail.value || '').trim().length > 0
+)
 
 const canSubmitDelete = computed(() => deleteConfirmMatches.value && hasValidEmail.value)
 
@@ -275,7 +282,8 @@ async function confirmDelete() {
   clearError()
   try {
     const url = auth.apiUrl('/api/submissions/model/delete')
-    const email = auth.user?.email ?? requestEmail.value.trim()
+    const email =
+      (auth.user?.email && String(auth.user.email).trim()) || requestEmail.value.trim()
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -446,6 +454,10 @@ function onPlacementsSubmitted() {
 
 onMounted(() => fetchModel())
 watch(() => route.params.id, () => fetchModel())
+
+watch(needsContactEmail, () => {
+  if (!needsContactEmail.value) requestEmail.value = ''
+})
 </script>
 
 <style scoped>

@@ -53,7 +53,7 @@
             <InputNumber id="edit-heading" v-model="editForm.heading" :min="0" :max="360" />
           </div>
         </div>
-        <div v-if="!auth.isAuthenticated" class="field mt-2">
+        <div v-if="needsContactEmail" class="field mt-2">
           <label for="edit-email">Email <span class="required">*</span></label>
           <InputText id="edit-email" v-model="requestEmail" type="email" placeholder="Your email address" class="w-full" />
           <small class="text-secondary">Required to associate this request with your contact.</small>
@@ -85,7 +85,7 @@
         <label for="delete-confirm-id">Object ID</label>
         <InputText id="delete-confirm-id" v-model="deleteConfirmId" placeholder="Enter object ID" class="w-full" />
       </div>
-      <div v-if="!auth.isAuthenticated" class="field">
+      <div v-if="needsContactEmail" class="field">
         <label for="delete-email">Email <span class="required">*</span></label>
         <InputText id="delete-email" v-model="requestEmail" type="email" placeholder="Your email address" class="w-full" />
         <small class="text-secondary">Required to associate this request with your contact.</small>
@@ -154,10 +154,15 @@ const deleteConfirmMatches = computed(() => {
   return entered === String(id)
 })
 
-const hasValidEmail = computed(() => {
-  if (auth.isAuthenticated && auth.user?.email) return true
-  return (requestEmail.value || '').trim().length > 0
-})
+const hasSessionContactEmail = computed(
+  () => auth.isAuthenticated && !!(auth.user?.email && String(auth.user.email).trim())
+)
+
+const needsContactEmail = computed(() => !hasSessionContactEmail.value)
+
+const hasValidEmail = computed(
+  () => hasSessionContactEmail.value || (requestEmail.value || '').trim().length > 0
+)
 
 const canSubmitDelete = computed(() => deleteConfirmMatches.value && hasValidEmail.value)
 
@@ -229,7 +234,8 @@ async function confirmDelete() {
   deleteSubmitting.value = true
   try {
     const url = auth.apiUrl('/api/submissions/object/delete')
-    const email = auth.user?.email ?? requestEmail.value.trim()
+    const email =
+      (auth.user?.email && String(auth.user.email).trim()) || requestEmail.value.trim()
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -261,7 +267,8 @@ async function submitUpdateRequest() {
   updateSubmitting.value = true
   try {
     const url = auth.apiUrl('/api/submissions/object/update')
-    const email = auth.user?.email ?? requestEmail.value.trim()
+    const email =
+      (auth.user?.email && String(auth.user.email).trim()) || requestEmail.value.trim()
     const body = {
       objectId: object.value.id,
       modelId: object.value.modelId ?? 0,
@@ -345,6 +352,10 @@ watch(object, (obj) => {
 
 watch(showUpdateForm, (visible) => {
   if (visible && object.value) syncEditFormFromObject()
+})
+
+watch(needsContactEmail, () => {
+  if (!needsContactEmail.value) requestEmail.value = ''
 })
 </script>
 
