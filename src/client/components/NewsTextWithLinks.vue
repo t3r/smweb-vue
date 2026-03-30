@@ -19,6 +19,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { stripHtmlTags } from '@/utils/stripHtmlTags'
 
 const props = withDefaults(
   defineProps<{
@@ -29,9 +30,12 @@ const props = withDefaults(
   { authorId: null, authorName: null }
 )
 
+/** Raw DB text with any HTML-like tags removed before link parsing and display. */
+const safeText = computed(() => stripHtmlTags(props.text ?? ''))
+
 /** Split text into author prefix (before " has ") and the rest. */
 const parsed = computed(() => {
-  const t = props.text || ''
+  const t = safeText.value
   const hasIndex = t.indexOf(' has ')
   if (hasIndex < 0) return { authorSegment: null as string | null, restWithHas: t }
   return {
