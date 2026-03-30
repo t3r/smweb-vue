@@ -69,7 +69,9 @@
         <Column header="Country" style="width: 5rem">
           <template #body="{ data }">
             <span v-if="data.countryLoading" class="text-secondary">…</span>
-            <span v-else>{{ data.country || '—' }}</span>
+            <span v-else :title="!data.country ? 'No land polygon (e.g. ocean); stored as unset' : ''">
+              {{ data.country || '—' }}
+            </span>
           </template>
         </Column>
         <Column style="width: 4rem">
@@ -301,13 +303,7 @@ async function submit() {
   submitting.value = true
   try {
     for (const d of drafts.value) {
-      if (!d.country) {
-        await hydrateCountry(d)
-        if (!d.country) {
-          error.value = `Could not resolve country for position ${d.lat}, ${d.lon}`
-          return
-        }
-      }
+      if (d.countryLoading) await hydrateCountry(d)
     }
     const desc = props.modelName.trim().slice(0, 100)
     const payload: Record<string, unknown> = {

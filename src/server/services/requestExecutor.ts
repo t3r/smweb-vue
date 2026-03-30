@@ -53,11 +53,16 @@ async function executeModelAdd(content: Record<string, unknown>): Promise<{ mode
   })
   const modelId = modelRow.id
 
+  const rawC = ob.country
+  const countryNorm =
+    rawC == null || rawC === ''
+      ? null
+      : String(rawC).trim().toLowerCase().slice(0, 2) || null
   const objPayload = {
     description: (ob.description as string) || '',
     longitude: Number(ob.longitude),
     latitude: Number(ob.latitude),
-    country: ob.country as string,
+    country: countryNorm,
     modelId,
     offset: (ob.offset === 'NULL' || ob.offset == null ? null : ob.offset) as number | null,
     orientation: (ob.orientation as number) ?? 0,
@@ -89,11 +94,16 @@ async function executeObjectsAdd(content: Record<string, unknown>[]): Promise<{ 
   for (const ob of content) {
     const rawOffset = ob.offset === 'NULL' || ob.offset == null ? null : ob.offset
     const offset: number | null = rawOffset === null ? null : Number(rawOffset)
+    const rawC = ob.country
+    const countryNorm =
+      rawC == null || rawC === ''
+        ? null
+        : String(rawC).trim().toLowerCase().slice(0, 2) || null
     const row = await objectRepo.insertOne({
       description: (ob.description as string) || '',
       longitude: Number(ob.longitude),
       latitude: Number(ob.latitude),
-      country: ob.country as string,
+      country: countryNorm,
       modelId: Number(ob.modelId),
       offset,
       orientation: (ob.orientation as number) ?? 0,
@@ -104,11 +114,16 @@ async function executeObjectsAdd(content: Record<string, unknown>[]): Promise<{ 
 }
 
 async function executeObjectUpdate(content: Record<string, unknown>): Promise<{ objectId: number }> {
+  const rawC = content.country
+  const countryNorm =
+    rawC == null || rawC === ''
+      ? null
+      : String(rawC).trim().toLowerCase().slice(0, 2) || null
   await objectRepo.updateOne(Number(content.objectId), {
     description: (content.description as string) || '',
     longitude: Number(content.longitude),
     latitude: Number(content.latitude),
-    country: content.country as string,
+    country: countryNorm,
     modelId: Number(content.modelId),
     offset: (content.offset === 'NULL' || content.offset == null ? null : Number(content.offset)) as number | null,
     orientation: (content.orientation as number) ?? 0,

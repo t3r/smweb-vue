@@ -238,9 +238,18 @@ export async function submitObjects(req: Request, res: Response): Promise<void> 
       const modelId = Number(o.modelId)
       const lat = Number(o.lat)
       const lon = Number(o.lon)
-      const country = String(o.country || '').trim().toLowerCase().slice(0, 2)
-      if (!modelId || !Number.isFinite(lat) || !Number.isFinite(lon) || !country) {
-        res.status(400).json({ error: `object[${i}]: modelId, lat, lon, country required` })
+      const rawCountry = o.country
+      let country: string | null = null
+      if (rawCountry != null && String(rawCountry).trim() !== '') {
+        const c = String(rawCountry).trim().toLowerCase().slice(0, 2)
+        if (c.length === 2) country = c
+        else {
+          res.status(400).json({ error: `object[${i}]: country must be a 2-letter code or omitted for ocean / no polygon` })
+          return
+        }
+      }
+      if (!modelId || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+        res.status(400).json({ error: `object[${i}]: modelId, lat, and lon are required` })
         return
       }
       const existing = await modelRepo.findById(modelId)

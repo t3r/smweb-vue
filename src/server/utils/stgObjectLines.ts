@@ -27,7 +27,8 @@ export interface StgResolvedObject {
   modelId: number
   lat: number
   lon: number
-  country: string
+  /** ISO-ish 2-letter code, or null if no polygon (e.g. ocean). */
+  country: string | null
   elevationOffset: number
   heading: number
   description: string
@@ -114,13 +115,11 @@ export async function parseStgObjectLines(stg: string): Promise<ParseStgResult> 
       }
     }
 
-    let countryCode = ''
+    let countryCode: string | null = null
     if (Number.isFinite(lon) && Number.isFinite(lat)) {
       const country = await countryRepo.findCountryAt(lon, lat)
-      if (!country?.code) {
-        messages.push('Could not resolve country at this position')
-      } else {
-        countryCode = country.code
+      if (country?.code) {
+        countryCode = String(country.code).trim().toLowerCase().slice(0, 2) || null
       }
     }
 

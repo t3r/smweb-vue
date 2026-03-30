@@ -239,7 +239,8 @@ export interface InsertObjectData {
   description?: string
   longitude: number
   latitude: number
-  country: string
+  /** Two-letter code or null (e.g. ocean / no country polygon). */
+  country: string | null
   modelId: number
   offset?: number | null
   orientation?: number
@@ -256,6 +257,10 @@ export async function insertOne(data: InsertObjectData): Promise<{ id: number }>
     orientation = 0,
   } = data
   const elevoffset = (offset == null || offset === ('' as unknown)) ? null : Number(offset)
+  const countryVal =
+    country == null || String(country).trim() === ''
+      ? null
+      : String(country).trim().toLowerCase().slice(0, 2)
   const rows = await sequelize.query(
     `INSERT INTO fgs_objects (ob_id, ob_text, wkb_geometry, ob_gndelev, ob_elevoffset, ob_heading, ob_country, ob_model, ob_group)
      VALUES (DEFAULT, :desc, ST_SetSRID(ST_MakePoint(:lon::float, :lat::float), 4326), -9999, :elevoffset, :orientation, :country, :modelId, 1)
@@ -267,7 +272,7 @@ export async function insertOne(data: InsertObjectData): Promise<{ id: number }>
         lat: Number(latitude),
         elevoffset,
         orientation: Number(orientation),
-        country: String(country).trim().toLowerCase().slice(0, 2),
+        country: countryVal,
         modelId: Number(modelId),
       },
       type: QueryTypes.SELECT,
@@ -280,7 +285,7 @@ export interface UpdateObjectData {
   description?: string
   longitude: number
   latitude: number
-  country: string
+  country: string | null
   modelId: number
   offset?: number | null
   orientation?: number
@@ -297,6 +302,10 @@ export async function updateOne(id: number, data: UpdateObjectData): Promise<voi
     orientation = 0,
   } = data
   const elevoffset = (offset == null || offset === ('' as unknown)) ? null : Number(offset)
+  const countryVal =
+    country == null || String(country).trim() === ''
+      ? null
+      : String(country).trim().toLowerCase().slice(0, 2)
   await sequelize.query(
     `UPDATE fgs_objects SET
        ob_text = :desc,
@@ -313,7 +322,7 @@ export async function updateOne(id: number, data: UpdateObjectData): Promise<voi
         desc: description ?? '',
         lon: Number(longitude),
         lat: Number(latitude),
-        country: String(country).trim().toLowerCase().slice(0, 2),
+        country: countryVal,
         elevoffset,
         orientation: Number(orientation),
         modelId: Number(modelId),

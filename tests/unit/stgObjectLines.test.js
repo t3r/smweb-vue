@@ -50,4 +50,11 @@ describe('parseStgObjectLines — path and injection resilience', () => {
     expect(r.objects[0].modelId).toBe(1)
     expect(r.objects[0].country).toBe('de')
   })
+
+  it('returns ok with null country when no polygon (e.g. ocean)', async () => {
+    vi.mocked(findCountryAt).mockResolvedValue(null)
+    const r = await parseStgObjectLines('OBJECT_SHARED Models/windsock 8.5 52.3 100 0\n')
+    expect(r.ok).toBe(true)
+    expect(r.objects[0].country).toBeNull()
+  })
 })
