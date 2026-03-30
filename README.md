@@ -29,4 +29,6 @@ npm run build   # `dist/server` (tsc) + `dist/public` (Vite)
 npm start       # `node dist/server/app.js`
 ```
 
+**Footer version string:** At build time Vite sets `Version-Tag` from, in order: `VITE_APP_GIT_SLUG` or `GIT_SLUG`, else a one-line `VERSION` file in the repo root, else `git rev-parse --short HEAD`, else `dev`. On hosts without `.git`, run e.g. `git rev-parse --short HEAD > VERSION` (or write the CI commit SHA) before `npm run build`.
+
 Require `NODE_ENV=production`, `FRONTEND_URL` (exact public origin), `SESSION_SECRET` (≥32 characters). The process listens on `PORT` and binds to `IP` if set, otherwise `::` (IPv6). Behind a reverse proxy, set `TRUST_PROXY=1` so `req.ip` and cookies use `X-Forwarded-*`. Same host for API and SPA: do not set `VITE_API_URL` (client uses relative `/api/...`). Optional: `CLIENT_DIST_PATH` if the static build is not next to `dist/server`.

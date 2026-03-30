@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
+import { resolveGitSlug } from './scripts/resolve-git-slug.mjs'
+
+const appGitSlug = resolveGitSlug()
 
 export default defineConfig({
+  define: {
+    __FGS_GIT_SLUG__: JSON.stringify(appGitSlug),
+  },
   plugins: [vue()],
   root: 'src/client',
   server: {

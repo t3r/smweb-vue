@@ -26,6 +26,14 @@
     <main>
       <router-view />
     </main>
+    <footer class="site-footer">
+      <p class="site-footer-text">
+        Data on this site is licensed under
+        <a href="https://www.gnu.org/licenses/gpl-2.0.html" target="_blank" rel="noopener noreferrer">GPL-2.0+</a>.
+        Copyright of each model is owned by the author. Website by and © Torsten Dreyer.
+        <span class="site-footer-version">Version-Tag: {{ gitSlug }}</span>
+      </p>
+    </footer>
   </div>
 </template>
 
@@ -38,6 +46,8 @@ import { useAuthStore } from '@/stores/auth'
 const router = useRouter()
 const auth = useAuthStore()
 const loginMenuRef = ref(null)
+
+const gitSlug = typeof __FGS_GIT_SLUG__ !== 'undefined' ? __FGS_GIT_SLUG__ : 'dev'
 
 const navItems = computed(() => {
   const items = [
@@ -74,21 +84,15 @@ function toggleLoginMenu(event) {
 .layout-root {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
 }
 main {
-  flex: 1 1 0;
-  min-height: 0;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   padding: 1rem;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
-}
-main > * {
-  flex: 1 1 0;
-  min-height: 0;
 }
 .logo-link {
   display: inline-flex;
@@ -125,5 +129,34 @@ main > * {
 }
 .user-name-link:hover {
   text-decoration: underline;
+}
+.site-footer {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--p-content-border-color, rgba(0, 0, 0, 0.12));
+  background: var(--p-surface-50, rgba(0, 0, 0, 0.02));
+}
+.site-footer-text {
+  margin: 0;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--p-text-muted-color, var(--p-text-secondary-color, #64748b));
+  text-align: center;
+}
+.site-footer-text a {
+  color: var(--p-primary-color);
+  text-decoration: none;
+}
+.site-footer-text a:hover {
+  text-decoration: underline;
+}
+.site-footer-version {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 </style>

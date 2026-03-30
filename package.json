@@ -39,7 +39,7 @@
     "pinia": "^3.0.3",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
-    "sequelize": "^6.37.7",
+    "sequelize": "^6.37.8",
     "sharp": "^0.34.5",
     "supercluster": "^7.1.5",
     "tar-stream": "^3.1.8",

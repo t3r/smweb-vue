@@ -6,6 +6,9 @@ npm-debug.log*
 .env
 .env.local
 
+# Deploy-generated app version (see VERSION.example, scripts/resolve-git-slug.mjs)
+VERSION
+
 # Build outputs
 dist/
 build/

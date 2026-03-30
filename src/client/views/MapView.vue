@@ -51,10 +51,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Tall map; chrome ≈ menubar + main padding + footer below main. */
 .map-view-root {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: calc(100vh - 9.5rem);
+  min-height: calc(100dvh - 9.5rem);
 }
 .map-view-card {
   flex: 1 1 0;
