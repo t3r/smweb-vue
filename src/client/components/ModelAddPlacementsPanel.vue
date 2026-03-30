@@ -190,9 +190,7 @@ const canSubmit = computed(() => {
       d.lat >= -90 &&
       d.lat <= 90 &&
       d.lon >= -180 &&
-      d.lon <= 180 &&
-      d.country &&
-      !d.countryLoading
+      d.lon <= 180
   )
 })
 
