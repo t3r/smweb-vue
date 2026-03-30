@@ -1,7 +1,12 @@
 import passport from 'passport'
 import GitHubStrategy from 'passport-github2'
 import GitLabStrategy from 'passport-gitlab2'
-import { findOrCreateUser, AUTH_PROVIDER_GITHUB, AUTH_PROVIDER_GITLAB } from '../services/authService.js'
+import {
+  findOrCreateUser,
+  getSessionUserByAuthorId,
+  AUTH_PROVIDER_GITHUB,
+  AUTH_PROVIDER_GITLAB,
+} from '../services/authService.js'
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET
@@ -79,11 +84,37 @@ if (GITLAB_CLIENT_ID && GITLAB_CLIENT_SECRET) {
 }
 
 passport.serializeUser((user, done) => {
-  done(null, user)
+  const id = (user as { id: number }).id
+  done(null, id)
 })
 
-passport.deserializeUser((user, done) => {
-  done(null, user as Express.User)
+function deserializePayloadToAuthorId(payload: unknown): number | null {
+  if (typeof payload === 'number' && Number.isInteger(payload) && payload >= 1) return payload
+  if (payload && typeof payload === 'object' && 'id' in payload) {
+    const id = Number((payload as { id: unknown }).id)
+    if (Number.isInteger(id) && id >= 1) return id
+  }
+  return null
+}
+
+passport.deserializeUser((payload: unknown, done) => {
+  void (async () => {
+    try {
+      const authorId = deserializePayloadToAuthorId(payload)
+      if (authorId == null) {
+        done(null, false)
+        return
+      }
+      const user = await getSessionUserByAuthorId(authorId)
+      if (!user) {
+        done(null, false)
+        return
+      }
+      done(null, user as Express.User)
+    } catch (err) {
+      done(err as Error)
+    }
+  })()
 })
 
 export default passport

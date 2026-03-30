@@ -71,6 +71,7 @@ const isAdmin = computed(() => auth.isAdmin)
 const roleOptions = [
   { label: 'User', value: 'user' },
   { label: 'Reviewer', value: 'reviewer' },
+  { label: 'Tester', value: 'tester' },
   { label: 'Admin', value: 'admin' },
 ]
 
@@ -96,7 +97,7 @@ function formatLastLogin(isoString) {
 
 function roleLabel(role) {
   if (!role) return '—'
-  const labels = { user: 'User', reviewer: 'Reviewer', admin: 'Admin' }
+  const labels = { user: 'User', reviewer: 'Reviewer', tester: 'Tester', admin: 'Admin' }
   return labels[role] || role
 }
 
@@ -117,6 +118,7 @@ async function onRoleChange() {
       throw new Error(data.error || res.statusText)
     }
     author.value = { ...author.value, role }
+    await auth.fetchUser()
     roleSaveStatus.value = 'Saved'
     setTimeout(() => { roleSaveStatus.value = '' }, 2000)
   } catch (err) {
@@ -135,7 +137,7 @@ async function fetchAuthor() {
   selectedRole.value = null
   roleSaveStatus.value = ''
   try {
-    const res = await fetch(`/api/authors/${id}`, { credentials: 'include' })
+    const res = await fetch(auth.apiUrl(`/api/authors/${id}`), { credentials: 'include' })
     if (!res.ok) {
       if (res.status === 404) error.value = 'Author not found'
       else throw new Error(res.statusText)

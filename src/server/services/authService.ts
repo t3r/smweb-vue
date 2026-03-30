@@ -31,4 +31,19 @@ export async function findOrCreateUser(
   }
 }
 
+/** Load current name, email, role from DB for session restore (role must stay in sync with fgs_user_roles). */
+export async function getSessionUserByAuthorId(authorId: number): Promise<SessionUser | null> {
+  if (!Number.isInteger(authorId) || authorId < 1) return null
+  const author = await Author.findByPk(authorId, { attributes: ['id', 'name', 'email'] })
+  if (!author) return null
+  const role = await authRepo.getRoleForAuthor(authorId)
+  const row = author as { get?: (k: string) => unknown }
+  return {
+    id: authorId,
+    name: String(row.get?.('name') ?? 'User') || 'User',
+    email: String(row.get?.('email') ?? '') || '',
+    role,
+  }
+}
+
 export { AUTH_PROVIDER_GITHUB, AUTH_PROVIDER_GITLAB }
