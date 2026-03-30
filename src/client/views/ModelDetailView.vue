@@ -1,7 +1,6 @@
 <template>
   <div>
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-    <p v-else-if="loading" class="m-0">Loading…</p>
+    <p v-if="loading" class="m-0">Loading…</p>
     <template v-else-if="model">
       <Breadcrumb :model="breadcrumbItems" class="mb-3">
         <template #item="{ item }">
@@ -46,7 +45,6 @@
 
       <Panel class="mt-4" header="Objects using this model">
         <p class="text-secondary mt-0 mb-3">Placements in the scenery database for this model.</p>
-        <Message v-if="objectsError" severity="error" class="mb-3">{{ objectsError }}</Message>
         <DataTable
           :value="modelObjects"
           :loading="objectsLoading"
@@ -145,6 +143,9 @@
         <Button label="Delete" severity="danger" :disabled="!canSubmitDelete" @click="confirmDelete" :loading="deleteSubmitting" />
       </template>
     </Dialog>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
+    <ErrorDialog v-model:visible="objectsErrorDialogVisible" :message="objectsError ?? ''" />
   </div>
 </template>
 
@@ -156,6 +157,8 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Panel from 'primevue/panel'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 import ModelDetailsCard from '@/components/ModelDetailsCard.vue'
 import ModelContentCard from '@/components/ModelContentCard.vue'
 import ModelAddPlacementsPanel from '@/components/ModelAddPlacementsPanel.vue'
@@ -171,7 +174,7 @@ const model = ref<{
   groupId?: number
 } | null>(null)
 const loading = ref(true)
-const error = ref<string | null>(null)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 
 const deleteDialogVisible = ref(false)
 const deleteConfirmId = ref('')
@@ -194,6 +197,7 @@ const objectsFirst = ref(0)
 const objectsPageSize = 15
 const objectsLoading = ref(false)
 const objectsError = ref<string | null>(null)
+const objectsErrorDialogVisible = ref(false)
 const objectsSortField = ref('lastUpdated')
 const objectsSortOrder = ref(-1)
 
@@ -268,7 +272,7 @@ function onDeleteDialogHide() {
 async function confirmDelete() {
   if (!deleteConfirmMatches.value || !model.value || objectsTotal.value > 0) return
   deleteSubmitting.value = true
-  error.value = null
+  clearError()
   try {
     const url = auth.apiUrl('/api/submissions/model/delete')
     const email = auth.user?.email ?? requestEmail.value.trim()
@@ -287,10 +291,10 @@ async function confirmDelete() {
       deleteDialogVisible.value = false
       deleteSuccessMessage.value = (data.message as string) || 'Delete request queued for review.'
     } else {
-      error.value = (data.error as string) || res.statusText
+      showError((data.error as string) || res.statusText)
     }
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to submit delete request'
+    showError((err as Error).message || 'Failed to submit delete request')
   } finally {
     deleteSubmitting.value = false
   }
@@ -300,13 +304,13 @@ async function fetchModel() {
   const id = route.params.id
   if (!id) return
   loading.value = true
-  error.value = null
+  clearError()
   model.value = null
   objectsFirst.value = 0
   try {
     const res = await fetch(auth.apiUrl(`/api/models/${id}`), { credentials: 'include' })
     if (!res.ok) {
-      if (res.status === 404) error.value = 'Model not found'
+      if (res.status === 404) showError('Model not found')
       else throw new Error(res.statusText)
       return
     }
@@ -314,7 +318,7 @@ async function fetchModel() {
     model.value = data
     await Promise.all([fetchModelObjects(), fetchObjectsForMap()])
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load model'
+    showError((err as Error).message || 'Failed to load model')
   } finally {
     loading.value = false
   }
@@ -363,6 +367,7 @@ async function fetchModelObjects() {
   }
   objectsLoading.value = true
   objectsError.value = null
+  objectsErrorDialogVisible.value = false
   try {
     const params = new URLSearchParams({
       model: String(mid),
@@ -388,6 +393,7 @@ async function fetchModelObjects() {
     objectsTotal.value = data.total ?? 0
   } catch (err) {
     objectsError.value = (err as Error).message || 'Failed to load objects'
+    objectsErrorDialogVisible.value = true
     modelObjects.value = []
     objectsTotal.value = 0
   } finally {

@@ -3,8 +3,6 @@
     <h1 class="mt-0">Authors</h1>
     <p class="text-color-secondary mb-4">Browse authors. Click a name to view details and their models.</p>
 
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-
     <DataTable
       v-model:filters="filters"
       :value="authors"
@@ -67,11 +65,15 @@
         </div>
       </template>
     </DataTable>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 
 const authors = ref([])
 const total = ref(0)
@@ -85,7 +87,7 @@ const filters = ref({
   description: { value: null, matchMode: 'contains' },
 })
 const loading = ref(true)
-const error = ref(null)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 
 function truncate(str) {
   if (!str || typeof str !== 'string') return '—'
@@ -101,7 +103,7 @@ function applyStringFilters() {
 
 async function fetchAuthors() {
   loading.value = true
-  error.value = null
+  clearError()
   try {
     const params = new URLSearchParams({ offset: String(offset.value), limit: String(limit) })
     const nameVal = filters.value.name?.value
@@ -116,7 +118,7 @@ async function fetchAuthors() {
     authors.value = data.authors || []
     total.value = data.total ?? 0
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load authors'
+    showError((err as Error).message || 'Failed to load authors')
     authors.value = []
     total.value = 0
   } finally {

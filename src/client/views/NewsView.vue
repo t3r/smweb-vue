@@ -3,8 +3,7 @@
     <h1 class="mt-0">News</h1>
     <p class="text-color-secondary mb-4">Recent activity: processed position requests and other updates.</p>
 
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-    <p v-else-if="loading" class="m-0">Loading…</p>
+    <p v-if="loading" class="m-0">Loading…</p>
     <template v-else-if="news.length">
       <ul class="news-full-list list-none p-0 m-0">
         <li v-for="item in news" :key="item.id" class="news-full-item py-3 border-bottom-1 surface-border">
@@ -18,14 +17,16 @@
         <Button label="Load more" icon="pi pi-chevron-down" :loading="loadingMore" @click="loadMore" />
       </div>
     </template>
-    <p v-else class="m-0 text-color-secondary">No news yet.</p>
+    <p v-else-if="initialLoadOk" class="m-0 text-color-secondary">No news yet.</p>
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 import NewsTextWithLinks from '@/components/NewsTextWithLinks.vue'
 
 const PAGE_SIZE = 20
@@ -42,7 +43,8 @@ const news = ref<NewsItem[]>([])
 const total = ref(0)
 const loading = ref(true)
 const loadingMore = ref(false)
-const error = ref<string | null>(null)
+const initialLoadOk = ref(false)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 
 const hasMore = ref(false)
 
@@ -74,11 +76,11 @@ async function fetchNews(offset: number, append: boolean) {
 
 async function loadMore() {
   loadingMore.value = true
-  error.value = null
+  clearError()
   try {
     await fetchNews(news.value.length, true)
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load more'
+    showError((err as Error).message || 'Failed to load more')
   } finally {
     loadingMore.value = false
   }
@@ -86,11 +88,13 @@ async function loadMore() {
 
 onMounted(async () => {
   loading.value = true
-  error.value = null
+  initialLoadOk.value = false
+  clearError()
   try {
     await fetchNews(0, false)
+    initialLoadOk.value = true
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load news'
+    showError((err as Error).message || 'Failed to load news')
   } finally {
     loading.value = false
   }

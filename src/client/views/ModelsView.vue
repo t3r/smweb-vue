@@ -5,8 +5,6 @@
       <router-link to="/models/add" class="add-model-link">Add model</router-link>
     </div>
 
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-
     <DataTable
       v-model:filters="filters"
       :value="models"
@@ -106,12 +104,16 @@
         </div>
       </template>
     </DataTable>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 
 const route = useRoute()
 const router = useRouter()
@@ -133,7 +135,7 @@ const filters = ref({
   author: { value: null as string | null, matchMode: 'contains' },
 })
 const loading = ref(true)
-const error = ref<string | null>(null)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 
 const typeFilterOptions = computed(() => {
   const all = { label: 'All types', value: null as string | null }
@@ -221,7 +223,7 @@ function applyTypeFilter(filterCallback?: () => void) {
 
 async function fetchModels() {
   loading.value = true
-  error.value = null
+  clearError()
   try {
     const params = new URLSearchParams({ offset: String(offset.value), limit: String(limit) })
     const nameVal = filters.value.name?.value
@@ -238,7 +240,7 @@ async function fetchModels() {
     models.value = data.models || []
     total.value = data.total ?? 0
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load models'
+    showError((err as Error).message || 'Failed to load models')
     models.value = []
     total.value = 0
   } finally {

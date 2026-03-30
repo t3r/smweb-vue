@@ -1,7 +1,6 @@
 <template>
   <div>
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-    <p v-else-if="loading" class="m-0">Loading…</p>
+    <p v-if="loading" class="m-0">Loading…</p>
     <template v-else-if="author">
       <Breadcrumb :model="breadcrumbItems" class="mb-3">
         <template #item="{ item }">
@@ -50,6 +49,8 @@
         </div>
       </Panel>
     </template>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
@@ -57,12 +58,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 
 const route = useRoute()
 const auth = useAuthStore()
 const author = ref(null)
 const loading = ref(true)
-const error = ref(null)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 const selectedRole = ref(null)
 const roleSaveStatus = ref('')
 
@@ -123,7 +126,7 @@ async function onRoleChange() {
     setTimeout(() => { roleSaveStatus.value = '' }, 2000)
   } catch (err) {
     roleSaveStatus.value = 'Failed'
-    error.value = (err as Error).message || 'Failed to update role'
+    showError((err as Error).message || 'Failed to update role')
     selectedRole.value = author.value?.role ?? 'user'
   }
 }
@@ -132,14 +135,14 @@ async function fetchAuthor() {
   const id = route.params.id
   if (!id) return
   loading.value = true
-  error.value = null
+  clearError()
   author.value = null
   selectedRole.value = null
   roleSaveStatus.value = ''
   try {
     const res = await fetch(auth.apiUrl(`/api/authors/${id}`), { credentials: 'include' })
     if (!res.ok) {
-      if (res.status === 404) error.value = 'Author not found'
+      if (res.status === 404) showError('Author not found')
       else throw new Error(res.statusText)
       return
     }
@@ -147,7 +150,7 @@ async function fetchAuthor() {
     author.value = data
     if (data.role != null) selectedRole.value = data.role
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load author'
+    showError((err as Error).message || 'Failed to load author')
   } finally {
     loading.value = false
   }

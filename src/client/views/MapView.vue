@@ -1,7 +1,5 @@
 <template>
   <div class="map-view-root">
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-
     <Card class="map-view-card">
       <template #content>
         <div class="map-view-card-content">
@@ -26,8 +24,6 @@ import ObjectMap from '@/components/ObjectMap.vue'
 const router = useRouter()
 const auth = useAuthStore()
 const objectsForDemo = ref([])
-const selectedObjects = ref([])
-const error = ref(null)
 
 function onObjectClick(id) {
   router.push(`/objects/${id}`)

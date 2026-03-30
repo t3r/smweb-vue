@@ -6,8 +6,6 @@
     </div>
     <p class="text-color-secondary mb-4">Browse object positions. Use the row filters for description, type, and country.</p>
 
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-
     <DataTable
       v-model:filters="filters"
       :value="objects"
@@ -117,12 +115,16 @@
         </div>
       </template>
     </DataTable>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 
 const route = useRoute()
 const router = useRouter()
@@ -147,7 +149,7 @@ const filters = ref({
   country: { value: null as string | null, matchMode: 'equals' },
 })
 const loading = ref(true)
-const error = ref<string | null>(null)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 
 const typeFilterOptions = computed(() => {
   const all = { label: 'All types', value: null as string | null }
@@ -322,7 +324,7 @@ async function fetchCountries() {
 
 async function fetchObjects() {
   loading.value = true
-  error.value = null
+  clearError()
   try {
     const params = new URLSearchParams({ offset: String(offset.value), limit: String(limit) })
     const descVal = filters.value.description?.value
@@ -339,7 +341,7 @@ async function fetchObjects() {
     objects.value = data.objects || []
     total.value = data.total ?? 0
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load objects'
+    showError((err as Error).message || 'Failed to load objects')
     objects.value = []
     total.value = 0
   } finally {

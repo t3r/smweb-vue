@@ -5,13 +5,12 @@
       Submit a static or shared 3D model to the FlightGear scenery database. Complete the steps below; you can go back to edit any step before submitting.
     </p>
 
-    <Message v-if="error" severity="error" class="mb-3" :closable="false">{{ error }}</Message>
-    <Message v-else-if="success" severity="success" class="mb-3" :closable="false">
+    <Message v-if="success" severity="success" class="mb-3" :closable="false">
       Your model has been queued for review (request #{{ successId }}). A reviewer will process it shortly.
       <router-link to="/models">Back to models</router-link>
     </Message>
 
-    <template v-else>
+    <template v-if="!success">
       <div class="stepper mb-4">
         <div
           v-for="(label, i) in stepLabels"
@@ -260,6 +259,8 @@
         </template>
       </Card>
     </template>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
@@ -271,12 +272,14 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 import ObjectMap from '@/components/ObjectMap.vue'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const stepLabels = ['Model & files', 'Location', 'Author & submit']
 const currentStep = ref(0)
-const error = ref<string | null>(null)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 const success = ref(false)
 const successId = ref<number | null>(null)
 const submitting = ref(false)
@@ -486,7 +489,7 @@ async function loadOptions() {
 
 async function submit() {
   if (!canSubmit.value || !ac3dFile.value || !thumbFile.value) return
-  error.value = null
+  clearError()
   submitting.value = true
   try {
     const fd = new FormData()
@@ -519,13 +522,13 @@ async function submit() {
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      error.value = (data.error as string) || res.statusText || 'Upload failed'
+      showError((data.error as string) || res.statusText || 'Upload failed')
       return
     }
     successId.value = data.id ?? null
     success.value = true
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Upload failed'
+    showError(err instanceof Error ? err.message : 'Upload failed')
   } finally {
     submitting.value = false
   }

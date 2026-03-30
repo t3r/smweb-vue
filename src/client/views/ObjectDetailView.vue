@@ -1,7 +1,6 @@
 <template>
   <div>
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-    <p v-else-if="loading" class="m-0">Loading…</p>
+    <p v-if="loading" class="m-0">Loading…</p>
     <template v-else-if="object">
       <Breadcrumb :model="breadcrumbItems" class="mb-3">
         <template #item="{ item }">
@@ -67,9 +66,11 @@
           <Button label="Submit" icon="pi pi-send" @click="submitUpdateRequest" :disabled="!canSubmitUpdate || hasPendingRequest" :loading="updateSubmitting" />
           <Button label="Cancel" severity="secondary" text @click="showUpdateForm = false" class="ml-2" />
         </div>
-        <Message v-if="updateMessage" :severity="updateMessageSeverity" class="mt-2">{{ updateMessage }}</Message>
+        <Message v-if="updateMessage" severity="success" class="mt-2">{{ updateMessage }}</Message>
       </Panel>
     </template>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
 
     <Dialog
       v-model:visible="deleteDialogVisible"
@@ -103,6 +104,8 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 import ObjectDetailsCard from '@/components/ObjectDetailsCard.vue'
 import ObjectMap from '@/components/ObjectMap.vue'
 
@@ -113,10 +116,11 @@ const object = ref<{
   description?: string | null
   modelId?: number
   country?: string | null
+  hasPendingRequest?: boolean
   position?: { lat?: number; lon?: number; offset?: number; heading?: number }
 } | null>(null)
 const loading = ref(true)
-const error = ref<string | null>(null)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 const countries = ref<{ code: string; name?: string | null }[]>([])
 
 const deleteDialogVisible = ref(false)
@@ -127,7 +131,6 @@ const requestEmail = ref('')
 const showUpdateForm = ref(false)
 const updateSubmitting = ref(false)
 const updateMessage = ref('')
-const updateMessageSeverity = ref<'success' | 'info' | 'warn' | 'error'>('info')
 
 const hasPendingRequest = computed(() => object.value?.hasPendingRequest === true)
 
@@ -240,13 +243,13 @@ async function confirmDelete() {
     const data = await res.json().catch(() => ({}))
     if (res.ok) {
       deleteDialogVisible.value = false
-      error.value = null
+      clearError()
       deleteSuccessMessage.value = (data.message as string) || 'Delete request queued for review.'
     } else {
-      error.value = (data.error as string) || res.statusText
+      showError((data.error as string) || res.statusText)
     }
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to submit delete request'
+    showError((err as Error).message || 'Failed to submit delete request')
   } finally {
     deleteSubmitting.value = false
   }
@@ -280,14 +283,11 @@ async function submitUpdateRequest() {
     const data = await res.json().catch(() => ({}))
     if (res.ok) {
       updateMessage.value = (data.message as string) || 'Update request queued for review.'
-      updateMessageSeverity.value = 'success'
     } else {
-      updateMessage.value = (data.error as string) || res.statusText
-      updateMessageSeverity.value = 'error'
+      showError((data.error as string) || res.statusText)
     }
   } catch (err) {
-    updateMessage.value = (err as Error).message || 'Failed to submit update request'
-    updateMessageSeverity.value = 'error'
+    showError((err as Error).message || 'Failed to submit update request')
   } finally {
     updateSubmitting.value = false
   }
@@ -297,12 +297,12 @@ async function fetchObject() {
   const id = route.params.id
   if (!id) return
   loading.value = true
-  error.value = null
+  clearError()
   object.value = null
   try {
     const res = await fetch(auth.apiUrl(`/api/objects/${id}`), { credentials: 'include' })
     if (!res.ok) {
-      if (res.status === 404) error.value = 'Object not found'
+      if (res.status === 404) showError('Object not found')
       else throw new Error(res.statusText)
       return
     }
@@ -310,7 +310,7 @@ async function fetchObject() {
     object.value = data
     syncEditFormFromObject()
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load object'
+    showError((err as Error).message || 'Failed to load object')
   } finally {
     loading.value = false
   }

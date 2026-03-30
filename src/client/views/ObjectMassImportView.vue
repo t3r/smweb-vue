@@ -13,13 +13,12 @@
       <li>Example: <code>OBJECT_SHARED Models/Airport/localizer.xml 121.337467 31.179872 2.47 267.03</code></li>
     </ul>
 
-    <Message v-if="error" severity="error" class="mb-3" :closable="false">{{ error }}</Message>
-    <Message v-else-if="success" severity="success" class="mb-3" :closable="false">
+    <Message v-if="success" severity="success" class="mb-3" :closable="false">
       Your objects were queued for review (request #{{ successId }}).
       <router-link to="/objects">Back to objects</router-link>
     </Message>
 
-    <template v-else>
+    <template v-if="!success">
       <Card>
         <template #content>
           <div class="form-grid">
@@ -88,12 +87,16 @@
         </template>
       </Card>
     </template>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 
 const auth = useAuthStore()
 
@@ -107,7 +110,7 @@ const maxLines = 100
 const stg = ref('')
 const email = ref('')
 const comment = ref('')
-const error = ref('')
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 const success = ref(false)
 const successId = ref<number | null>(null)
 const previewLoading = ref(false)
@@ -145,11 +148,11 @@ function validateFormFields(): string | null {
 }
 
 async function runPreview(): Promise<void> {
-  error.value = ''
+  clearError()
   previewErrorLines.value = []
   previewOkCount.value = null
   if (!stg.value.trim()) {
-    error.value = 'STG content is required'
+    showError('STG content is required')
     return
   }
   previewLoading.value = true
@@ -166,7 +169,7 @@ async function runPreview(): Promise<void> {
       count?: number
     }
     if (!res.ok) {
-      error.value = (data as { error?: string }).error || 'Preview failed'
+      showError((data as { error?: string }).error || 'Preview failed')
       return
     }
     if (data.ok && typeof data.count === 'number') {
@@ -174,20 +177,20 @@ async function runPreview(): Promise<void> {
     } else if (data.lineErrors?.length) {
       previewErrorLines.value = data.lineErrors
     } else {
-      error.value = 'Unexpected preview response'
+      showError('Unexpected preview response')
     }
   } catch {
-    error.value = 'Network error'
+    showError('Network error')
   } finally {
     previewLoading.value = false
   }
 }
 
 async function submit(): Promise<void> {
-  error.value = ''
+  clearError()
   const v = validateFormFields()
   if (v) {
-    error.value = v
+    showError(v)
     return
   }
   submitLoading.value = true
@@ -214,17 +217,17 @@ async function submit(): Promise<void> {
         previewErrorLines.value = data.lineErrors
         previewOkCount.value = null
       }
-      error.value = data.error || 'Submit failed'
+      showError(data.error || 'Submit failed')
       return
     }
     if (data.id != null) {
       success.value = true
       successId.value = data.id
     } else {
-      error.value = 'Unexpected response'
+      showError('Unexpected response')
     }
   } catch {
-    error.value = 'Network error'
+    showError('Network error')
   } finally {
     submitLoading.value = false
   }

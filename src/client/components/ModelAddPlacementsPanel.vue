@@ -6,8 +6,7 @@
       <code>lon lat [heading] [offset_m]</code> (whitespace or comma separated).
     </p>
 
-    <Message v-if="error" severity="error" class="mb-3" :closable="false">{{ error }}</Message>
-    <Message v-else-if="successMessage" severity="success" class="mb-3" :closable="true" @close="successMessage = ''">
+    <Message v-if="successMessage" severity="success" class="mb-3" :closable="true" @close="successMessage = ''">
       {{ successMessage }}
     </Message>
 
@@ -90,6 +89,8 @@
       <Button label="Submit for review" icon="pi pi-send" :loading="submitting" :disabled="!canSubmit" @click="submit" />
       <Button label="Clear pending" severity="secondary" text :disabled="drafts.length === 0" @click="clearDrafts" />
     </div>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </Panel>
 </template>
 
@@ -99,6 +100,7 @@ import { useAuthStore } from '@/stores/auth'
 import Panel from 'primevue/panel'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import ErrorDialog from '@/components/ErrorDialog.vue'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import DataTable from 'primevue/datatable'
@@ -143,8 +145,23 @@ const pasteText = ref('')
 const comment = ref('')
 const email = ref('')
 const error = ref('')
+const errorDialogVisible = ref(false)
 const successMessage = ref('')
 const submitting = ref(false)
+
+function clearError() {
+  error.value = ''
+  errorDialogVisible.value = false
+}
+
+function showError(message: string) {
+  error.value = message
+  errorDialogVisible.value = true
+}
+
+function onErrorDialogCleared() {
+  error.value = ''
+}
 const selectionPosition = ref<{ lat: number; lon: number } | null>(null)
 
 let keySeq = 0
@@ -218,7 +235,7 @@ async function hydrateCountry(d: Draft) {
 }
 
 function onMapClick(p: { lat: number; lon: number }) {
-  error.value = ''
+  clearError()
   successMessage.value = ''
   selectionPosition.value = { lat: p.lat, lon: p.lon }
   const d: Draft = {
@@ -270,10 +287,10 @@ function parsePasteLines(text: string): { lat: number; lon: number; heading: num
 }
 
 function appendFromPaste() {
-  error.value = ''
+  clearError()
   const parsed = parsePasteLines(pasteText.value)
   if (parsed.length === 0) {
-    error.value = 'No valid lines. Use: lon lat [heading] [offset_m]'
+    showError('No valid lines. Use: lon lat [heading] [offset_m]')
     return
   }
   const next = [...drafts.value]
@@ -297,7 +314,7 @@ function appendFromPaste() {
 }
 
 async function submit() {
-  error.value = ''
+  clearError()
   successMessage.value = ''
   if (!canSubmit.value) return
   submitting.value = true
@@ -328,7 +345,7 @@ async function submit() {
     })
     const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string; id?: number }
     if (!res.ok) {
-      error.value = data.error || 'Submit failed'
+      showError(data.error || 'Submit failed')
       return
     }
     successMessage.value = data.message || `Queued for review (request #${data.id ?? '?'})`
@@ -336,7 +353,7 @@ async function submit() {
     comment.value = ''
     emit('submitted')
   } catch (e) {
-    error.value = (e as Error).message || 'Network error'
+    showError((e as Error).message || 'Network error')
   } finally {
     submitting.value = false
   }

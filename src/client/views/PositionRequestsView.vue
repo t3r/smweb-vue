@@ -3,8 +3,6 @@
     <h1 class="mt-0">Position requests</h1>
     <p class="text-color-secondary mb-4">Entries from the position requests queue (reviewer/admin only).</p>
 
-    <Message v-if="error" severity="error" class="mb-3">{{ error }}</Message>
-
     <div v-if="loading" class="flex align-items-center justify-content-center p-4">
       <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
     </div>
@@ -156,12 +154,16 @@
         </template>
       </Card>
     </template>
+
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import ModelDetailsCard from '@/components/ModelDetailsCard.vue'
@@ -185,7 +187,7 @@ const pending = ref<PendingItem[]>([])
 const failed = ref([])
 const expandedRows = ref<Record<number, boolean>>({})
 const loading = ref(true)
-const error = ref<string | null>(null)
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 const countries = ref<{ code: string; name?: string | null }[]>([])
 
 const actionRequest = ref<{ sig: string } | null>(null)
@@ -259,11 +261,11 @@ async function fetchCountries() {
 
 async function fetchRequests() {
   loading.value = true
-  error.value = null
+  clearError()
   try {
     const res = await fetch(auth.apiUrl('/api/position-requests'), { credentials: 'include' })
     if (res.status === 403) {
-      error.value = 'You do not have permission to view position requests.'
+      showError('You do not have permission to view position requests.')
       pending.value = []
       failed.value = []
       return
@@ -273,7 +275,7 @@ async function fetchRequests() {
     pending.value = data.pending ?? []
     failed.value = data.failed ?? []
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to load position requests'
+    showError((err as Error).message || 'Failed to load position requests')
     pending.value = []
     failed.value = []
   } finally {
@@ -301,7 +303,7 @@ async function confirmAccept() {
   const sig = actionRequest.value?.sig
   if (!sig) return
   acceptLoading.value = true
-  error.value = null
+  clearError()
   try {
     const res = await fetch(auth.apiUrl(`/api/submissions/pending/${encodeURIComponent(sig)}/accept`), {
       method: 'POST',
@@ -314,10 +316,10 @@ async function confirmAccept() {
       actionRequest.value = null
       await fetchRequests()
     } else {
-      error.value = (data.error as string) || res.statusText
+      showError((data.error as string) || res.statusText)
     }
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to accept request'
+    showError((err as Error).message || 'Failed to accept request')
   } finally {
     acceptLoading.value = false
   }
@@ -327,7 +329,7 @@ async function confirmDecline() {
   const sig = actionRequest.value?.sig
   if (!sig) return
   declineLoading.value = true
-  error.value = null
+  clearError()
   try {
     const res = await fetch(auth.apiUrl(`/api/submissions/pending/${encodeURIComponent(sig)}/reject`), {
       method: 'POST',
@@ -341,10 +343,10 @@ async function confirmDecline() {
       onDeclineDialogHide()
       await fetchRequests()
     } else {
-      error.value = (data.error as string) || res.statusText
+      showError((data.error as string) || res.statusText)
     }
   } catch (err) {
-    error.value = (err as Error).message || 'Failed to decline request'
+    showError((err as Error).message || 'Failed to decline request')
   } finally {
     declineLoading.value = false
   }
