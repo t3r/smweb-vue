@@ -103,3 +103,11 @@ export async function insertOne(name: string, email: string): Promise<{ id: numb
   const row = (await Author.create({ name, email })) as unknown as { id: number }
   return { id: row.id }
 }
+
+/** Updates au_notes. Pass null to clear. Returns whether a row was updated. */
+export async function updateNotesById(id: number, notes: string | null): Promise<boolean> {
+  const safeId = Number(id)
+  if (!Number.isInteger(safeId) || safeId < 1) return false
+  const [updated] = await Author.update({ notes }, { where: { id: safeId } })
+  return updated > 0
+}

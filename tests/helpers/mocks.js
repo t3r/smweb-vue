@@ -92,6 +92,12 @@ vi.mock('../../src/server/services/authorService.ts', () => ({
   ),
   getAuthorById: vi.fn().mockImplementation((id) => (id === 1 ? Promise.resolve(stubAuthor) : Promise.resolve(null))),
   updateAuthorRole: vi.fn().mockResolvedValue(undefined),
+  updateOwnDescription: vi.fn().mockImplementation((_id, description) =>
+    Promise.resolve({
+      ok: true,
+      description: description == null || String(description).trim() === '' ? null : String(description).trim(),
+    })
+  ),
 }))
 
 vi.mock('../../src/server/services/newsService.ts', () => ({

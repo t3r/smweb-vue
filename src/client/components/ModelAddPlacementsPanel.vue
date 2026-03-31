@@ -13,8 +13,8 @@
     <div class="map-wrap mb-4">
       <ObjectMap
         :objects="mapDraftObjects"
-        :initial-center="mapCenter"
-        :initial-zoom="mapZoom"
+        :initial-center="PLACEMENTS_MAP_CENTER"
+        :initial-zoom="PLACEMENTS_MAP_ZOOM"
         selection-mode
         :selection-position="selectionPosition"
         :selection-skip-when-feature-hit="true"
@@ -108,6 +108,10 @@ import Column from 'primevue/column'
 import InputNumber from 'primevue/inputnumber'
 import ObjectMap from '@/components/ObjectMap.vue'
 
+/** World overview for add-placements map [lng, lat] + low zoom (MapLibre initial view). */
+const PLACEMENTS_MAP_CENTER: [number, number] = [0, 20]
+const PLACEMENTS_MAP_ZOOM = 1.2
+
 /** Minimal shape for ObjectMap markers (pending placements only). */
 interface DraftMapMarker {
   id: number
@@ -121,7 +125,6 @@ interface DraftMapMarker {
 const props = defineProps<{
   modelId: number
   modelName: string
-  mapCenter: [number, number]
 }>()
 
 const emit = defineEmits<{
@@ -173,12 +176,6 @@ function newKey() {
 const needsGuestEmail = computed(
   () => !auth.isAuthenticated || !(auth.user?.email && String(auth.user.email).trim())
 )
-
-const mapZoom = computed(() => {
-  const [lng, lat] = props.mapCenter
-  const isDefault = Math.abs(lng - 10) < 0.01 && Math.abs(lat - 53.5) < 0.01
-  return isDefault ? 6 : 8
-})
 
 const mapDraftObjects = computed((): DraftMapMarker[] =>
   drafts.value.map((d, i) => ({

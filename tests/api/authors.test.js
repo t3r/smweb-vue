@@ -43,3 +43,10 @@ describe('GET /api/authors/:id', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('PATCH /api/authors/:id', () => {
+  it('returns 401 when not authenticated', async () => {
+    const res = await request(app).patch('/api/authors/1').send({ description: 'About me' })
+    expect(res.status).toBe(401)
+  })
+})

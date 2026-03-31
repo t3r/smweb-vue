@@ -39,7 +39,6 @@
         class="mt-4"
         :model-id="model.id"
         :model-name="model.name || model.filename || `Model #${model.id}`"
-        :map-center="objectsMapCenter"
         @submitted="onPlacementsSubmitted"
       />
 
@@ -224,20 +223,6 @@ const deleteModelButtonDisabled = computed(
   () => hasPendingRequest.value || objectsLoading.value || objectsError.value != null || objectsTotal.value > 0
 )
 
-const objectsMapCenter = computed((): [number, number] => {
-  const withPos = objectsForMap.value.filter(
-    (o) =>
-      o.position?.lat != null &&
-      o.position?.lon != null &&
-      Number.isFinite(o.position.lat) &&
-      Number.isFinite(o.position.lon)
-  )
-  if (withPos.length === 0) return [10, 53.5]
-  const lat = withPos.reduce((s, o) => s + Number(o.position!.lat), 0) / withPos.length
-  const lon = withPos.reduce((s, o) => s + Number(o.position!.lon), 0) / withPos.length
-  return [lon, lat]
-})
-
 const breadcrumbItems = computed(() => [
   { label: 'Models', to: '/models' },
   { label: model.value?.name || model.value?.filename || 'Model', to: null },
@@ -324,7 +309,7 @@ async function fetchModel() {
     }
     const data = await res.json()
     model.value = data
-    await Promise.all([fetchModelObjects(), fetchObjectsForMap()])
+    await fetchModelObjects()
   } catch (err) {
     showError((err as Error).message || 'Failed to load model')
   } finally {
@@ -421,35 +406,8 @@ function onObjectsSort(e: { sortField?: string; sortOrder?: number }) {
   void fetchModelObjects()
 }
 
-async function fetchObjectsForMap() {
-  const mid = model.value?.id
-  if (mid == null || model.value.isStatic !== false) {
-    objectsForMap.value = []
-    return
-  }
-  try {
-    const params = new URLSearchParams({
-      model: String(mid),
-      offset: '0',
-      limit: '100',
-      sortField: 'id',
-      sortOrder: '1',
-    })
-    const res = await fetch(auth.apiUrl(`/api/objects?${params}`), { credentials: 'include' })
-    if (!res.ok) {
-      objectsForMap.value = []
-      return
-    }
-    const data = (await res.json()) as { objects?: typeof objectsForMap.value }
-    objectsForMap.value = data.objects || []
-  } catch {
-    objectsForMap.value = []
-  }
-}
-
 function onPlacementsSubmitted() {
   void fetchModelObjects()
-  void fetchObjectsForMap()
 }
 
 onMounted(() => fetchModel())

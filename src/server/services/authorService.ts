@@ -1,5 +1,6 @@
 import * as authorRepo from '../repositories/authorRepository.js'
 import * as authRepo from '../repositories/authRepository.js'
+import { stripHtmlTags } from '../utils/stripHtmlTags.js'
 
 interface AuthorRow {
   id: number
@@ -7,6 +8,12 @@ interface AuthorRow {
   email?: string
   notes?: string
   modelsCount?: number
+}
+
+function normalizeAuthorDescription(notes: unknown): string | null {
+  if (notes == null || notes === '') return null
+  const s = stripHtmlTags(String(notes)).trim()
+  return s === '' ? null : s
 }
 
 function toApiAuthor(row: AuthorRow | Record<string, unknown> | null, includeEmail = false): Record<string, unknown> | null {
@@ -17,7 +24,7 @@ function toApiAuthor(row: AuthorRow | Record<string, unknown> | null, includeEma
   const out: Record<string, unknown> = {
     id: r.id,
     name: r.name,
-    description: r.notes,
+    description: normalizeAuthorDescription(r.notes),
     modelsCount: r.modelsCount,
   }
   if (includeEmail) out.email = r.email ?? null
@@ -72,4 +79,28 @@ export async function getAuthorById(
 
 export async function updateAuthorRole(authorId: number, role: string): Promise<void> {
   await authRepo.setRoleForAuthor(authorId, role)
+}
+
+const MAX_AUTHOR_SELF_DESCRIPTION_LENGTH = 128
+
+/**
+ * Updates au_notes for the signed-in author only (caller must enforce id match).
+ * HTML-like markup is stripped; plain text only, max length after stripping.
+ */
+export async function updateOwnDescription(
+  authorId: number,
+  description: string | null
+): Promise<{ ok: true; description: string | null } | { ok: false; error: string }> {
+  const raw = description == null ? '' : String(description)
+  const noMarkup = stripHtmlTags(raw).trim()
+  if (noMarkup.length > MAX_AUTHOR_SELF_DESCRIPTION_LENGTH) {
+    return {
+      ok: false,
+      error: `Description must be at most ${MAX_AUTHOR_SELF_DESCRIPTION_LENGTH} characters (no markup).`,
+    }
+  }
+  const stored = noMarkup === '' ? null : noMarkup
+  const updated = await authorRepo.updateNotesById(authorId, stored)
+  if (!updated) return { ok: false, error: 'Author not found' }
+  return { ok: true, description: stored }
 }

@@ -6,6 +6,7 @@ const router = express.Router()
 
 router.get('/', authorsController.getAuthors)
 router.put('/:id/role', requireAuth, requireRole('admin'), authorsController.updateAuthorRole)
+router.patch('/:id', requireAuth, authorsController.updateAuthorDescription)
 router.get('/:id', authorsController.getAuthor)
 
 export default router

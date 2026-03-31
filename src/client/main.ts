@@ -19,6 +19,7 @@ import Breadcrumb from 'primevue/breadcrumb'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
 import Skeleton from 'primevue/skeleton'
 import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
@@ -111,6 +112,7 @@ app.component('Breadcrumb', Breadcrumb)
 app.component('Button', Button)
 app.component('Message', Message)
 app.component('InputText', InputText)
+app.component('Textarea', Textarea)
 app.component('Skeleton', Skeleton)
 app.component('Panel', Panel)
 app.component('Tag', Tag)
