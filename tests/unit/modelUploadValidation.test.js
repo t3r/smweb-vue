@@ -39,7 +39,7 @@ function acLines(textures) {
 
 beforeEach(() => {
   vi.mocked(modelRepo.findIdByPathBasename).mockResolvedValue(null)
-  vi.mocked(modelgroupRepo.existsById).mockImplementation((id) => Promise.resolve(Number(id) === 1))
+  vi.mocked(modelgroupRepo.existsById).mockImplementation((id) => Promise.resolve([0, 1].includes(Number(id))))
 })
 
 describe('assertFlatUploadFilename', () => {
@@ -199,7 +199,6 @@ describe('validateModelAddFormFields', () => {
     authorId: 2,
     latitudeRaw: '0',
     longitudeRaw: '0',
-    countryRaw: 'de',
     offsetRaw: '',
     headingRaw: '0',
   }
@@ -231,6 +230,11 @@ describe('validateModelAddFormFields', () => {
   it('rejects non-existent model group', async () => {
     vi.mocked(modelgroupRepo.existsById).mockResolvedValueOnce(false)
     expect(await validateModelAddFormFields({ ...base, groupId: 99 })).toMatch(/does not exist/)
+  })
+
+  it('accepts model family id 0 (Static)', async () => {
+    vi.mocked(modelgroupRepo.existsById).mockResolvedValueOnce(true)
+    expect(await validateModelAddFormFields({ ...base, groupId: 0 })).toBeNull()
   })
 
   it('requires author details when authorId is Other (1)', async () => {
@@ -270,10 +274,6 @@ describe('validateModelAddFormFields', () => {
     expect(await validateModelAddFormFields({ ...base, headingRaw: '-1' })).toMatch(/Heading/)
   })
 
-  it('rejects invalid country', async () => {
-    expect(await validateModelAddFormFields({ ...base, countryRaw: 'de4' })).toMatch(/Country/)
-    expect(await validateModelAddFormFields({ ...base, countryRaw: 'd-e' })).toMatch(/Country/)
-  })
 })
 
 describe('assertModelPathAvailable', () => {

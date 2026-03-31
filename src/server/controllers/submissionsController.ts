@@ -7,6 +7,7 @@ import { buildTarGz } from '../utils/buildTarGz.js'
 import { convertToThumbnailJpeg } from '../utils/thumbnailImage.js'
 import { isStgParseFailure, parseStgObjectLines, STG_MASS_IMPORT_MAX_LINES } from '../utils/stgObjectLines.js'
 import { enqueuePositionRequestCreated } from '../services/emailQueueEnqueue.js'
+import * as countryService from '../services/countryService.js'
 import {
   assertFileSizeUnderLimit,
   assertFlatUploadFilename,
@@ -310,7 +311,6 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
       groupId,
       longitude,
       latitude,
-      country,
       offset,
       heading,
       thumbnailBase64,
@@ -376,7 +376,6 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
       authorNew: authorNewForValidation,
       latitudeRaw: String(latitude),
       longitudeRaw: String(longitude),
-      countryRaw: String(country || '').trim(),
       offsetRaw: offset != null && offset !== '' ? String(offset) : '',
       headingRaw: heading != null && heading !== '' ? String(heading) : '0',
     })
@@ -384,6 +383,8 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: formErr })
       return
     }
+
+    const countryCode = await countryService.resolveCountryCodeAt(lon, lat)
 
     const pathErr = await assertModelPathAvailable(filenameTrim)
     if (pathErr) {
@@ -403,8 +404,6 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
       return
     }
 
-    const countryCode = String(country || '').trim().toLowerCase().slice(0, 2)
-
     const modelPayload = {
       filename: filenameTrim,
       author: authorIdFinal,
@@ -418,7 +417,7 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
       description: (name as string).trim().slice(0, 100),
       longitude: lon,
       latitude: lat,
-      country: countryCode,
+      country: countryCode ?? '',
       offset: offset == null || offset === '' ? 'NULL' : Number(offset),
       orientation: Number(heading) || 0,
       modelId: -1,
@@ -595,7 +594,6 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
       authorNew: authorNewForValidation,
       latitudeRaw: String(body.latitude ?? ''),
       longitudeRaw: String(body.longitude ?? ''),
-      countryRaw: String(body.country || '').trim(),
       offsetRaw: body.offset != null && body.offset !== '' ? String(body.offset) : '',
       headingRaw: body.heading != null && body.heading !== '' ? String(body.heading) : '0',
     })
@@ -606,7 +604,7 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
 
     const lat = Number(body.latitude)
     const lon = Number(body.longitude)
-    const countryCode = String(body.country || '').trim().toLowerCase().slice(0, 2)
+    const countryCode = await countryService.resolveCountryCodeAt(lon, lat)
 
     const acNorm = normalizeTextFileBuffer(ac3d.buffer)
     const xmlNorm = xmlFile?.buffer ? normalizeTextFileBuffer(xmlFile.buffer) : null
@@ -654,7 +652,7 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
       description: name.slice(0, 100),
       longitude: lon,
       latitude: lat,
-      country: countryCode,
+      country: countryCode ?? '',
       offset: body.offset != null && body.offset !== '' ? Number(body.offset) : 'NULL',
       orientation: Number(body.heading) || 0,
       modelId: -1,

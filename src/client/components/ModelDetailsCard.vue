@@ -20,7 +20,12 @@
           <span v-else>{{ authorDisplay.text }}</span>
         </p>
         <p v-if="model.description" class="m-0 mb-2 text-color-secondary">Description: {{ model.description }}</p>
-        <router-link v-if="model.id" to="/objects">Browse objects using this model</router-link>
+        <router-link
+          v-if="model.id"
+          :to="{ path: '/objects', query: { model: String(model.id) } }"
+        >
+          Browse objects using this model
+        </router-link>
       </div>
     </div>
   </Panel>

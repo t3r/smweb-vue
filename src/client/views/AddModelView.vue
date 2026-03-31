@@ -1,8 +1,8 @@
 <template>
   <div class="add-model-view">
     <h1 class="mt-0">Add a model</h1>
-    <p class="text-color-secondary mt-0 mb-4">
-      Submit a static or shared 3D model to the FlightGear scenery database. Complete the steps below; you can go back to edit any step before submitting.
+    <p class="text-color-secondary mt-0 intro-lead">
+      Submit a static or shared 3D model to the FlightGear scenery database. Fill in the sections below, then submit for review.
     </p>
 
     <Message v-if="success" severity="success" class="mb-3" :closable="false">
@@ -11,250 +11,241 @@
     </Message>
 
     <template v-if="!success">
-      <div class="stepper mb-4">
-        <div
-          v-for="(label, i) in stepLabels"
-          :key="i"
-          class="stepper-item"
-          :class="{ active: currentStep === i, done: currentStep > i }"
-        >
-          <span class="stepper-num">{{ i + 1 }}</span>
-          <span class="stepper-label">{{ label }}</span>
-          <span v-if="i < stepLabels.length - 1" class="stepper-sep" />
-        </div>
-      </div>
-
       <Card>
         <template #content>
-          <!-- Step 0: Model info & files -->
-          <div v-show="currentStep === 0" class="step-panel">
-            <h2 class="mt-0">Model details and files</h2>
-            <ul class="help-list mb-4">
-              <li>Use a common base name for files (e.g. <code>tower.ac</code>, <code>tower.xml</code>, <code>tower.png</code>).</li>
-              <li>PNG textures must have width and height as a power of 2.</li>
-              <li>Thumbnail can be any image format; it will be converted to 320×240 JPEG.</li>
-            </ul>
-            <div class="form-grid">
-              <label for="add-model-group">Model family <span class="required">*</span></label>
-              <Select
-                id="add-model-group"
-                v-model="form.groupId"
-                :options="groupOptions"
-                option-label="label"
-                option-value="value"
-                placeholder="Select family"
-                class="w-full"
-              />
-              <label for="add-model-name">Model name <span class="required">*</span></label>
-              <InputText
-                id="add-model-name"
-                v-model="form.name"
-                maxlength="100"
-                placeholder="e.g. Cornet antenna radome - Brittany - France"
-                class="w-full"
-              />
-              <label for="add-model-desc">Description</label>
-              <InputText
-                id="add-model-desc"
-                v-model="form.description"
-                maxlength="100"
-                placeholder="Optional details about the model"
-                class="w-full"
-              />
-              <label for="add-model-ac3d">AC3D file <span class="required">*</span></label>
-              <div class="file-cell">
-                <input
-                  id="add-model-ac3d"
-                  type="file"
-                  accept=".ac"
-                  @change="onAc3dChange"
-                />
-                <span class="file-name">{{ ac3dFileName || 'No file chosen' }}</span>
-              </div>
-              <label for="add-model-thumb">Thumbnail image <span class="required">*</span></label>
-              <div class="file-cell">
-                <input
-                  id="add-model-thumb"
-                  type="file"
-                  accept="image/*"
-                  @change="onThumbChange"
-                />
-                <span class="file-name">{{ thumbFileName || 'No file chosen' }}</span>
-              </div>
-              <label for="add-model-xml">XML file (optional)</label>
-              <div class="file-cell">
-                <input
-                  id="add-model-xml"
-                  type="file"
-                  accept=".xml,text/xml,application/xml"
-                  @change="onXmlChange"
-                />
-                <span class="file-name">{{ xmlFileName || 'None' }}</span>
-              </div>
-              <label for="add-model-png">PNG texture(s) (optional)</label>
-              <div class="file-cell">
-                <input
-                  id="add-model-png"
-                  type="file"
-                  accept=".png,image/png"
-                  multiple
-                  @change="onPngChange"
-                />
-                <span class="file-name">{{ pngFileSummary }}</span>
-              </div>
-            </div>
-          </div>
+          <div class="add-form-shell">
+            <div class="add-form-columns">
+              <!-- Left: model + files -->
+              <div class="add-form-col add-form-col--main">
+                <section class="form-section" aria-labelledby="add-model-section-model">
+                  <h2 id="add-model-section-model" class="form-section-title">Model</h2>
+                  <div class="field-pair">
+                    <div class="field">
+                      <label for="add-model-group" class="field-label">Model family <span class="required">*</span></label>
+                      <Select
+                        id="add-model-group"
+                        v-model="form.groupId"
+                        :options="groupOptions"
+                        option-label="label"
+                        option-value="value"
+                        placeholder="Select family"
+                        class="w-full"
+                      />
+                    </div>
+                    <div class="field">
+                      <label for="add-model-name" class="field-label">Model name <span class="required">*</span></label>
+                      <InputText
+                        id="add-model-name"
+                        v-model="form.name"
+                        maxlength="100"
+                        placeholder="e.g. Cornet antenna radome - Brittany - France"
+                        class="w-full"
+                      />
+                    </div>
+                  </div>
+                  <div class="field mt-field">
+                    <label for="add-model-desc" class="field-label">Description</label>
+                    <InputText
+                      id="add-model-desc"
+                      v-model="form.description"
+                      maxlength="100"
+                      placeholder="Optional details about the model"
+                      class="w-full"
+                    />
+                  </div>
+                </section>
 
-          <!-- Step 1: Location -->
-          <div v-show="currentStep === 1" class="step-panel">
-            <h2 class="mt-0">Location</h2>
-            <p class="text-color-secondary">Enter the position where the model is placed, or click on the map to set it. Required even for shared models.</p>
-            <div class="location-map-wrap mb-4">
-              <ObjectMap
-                :selection-mode="true"
-                :selection-position="locationSelectionPosition"
-                :initial-center="locationMapCenter"
-                :initial-zoom="10"
-                compact
-                @position-select="onMapPositionSelect"
-              />
-              <span class="location-map-hint">Click on the map to place the marker</span>
-            </div>
-            <div class="form-grid">
-              <label for="add-model-lon">Longitude <span class="required">*</span></label>
-              <InputText
-                id="add-model-lon"
-                v-model="form.longitude"
-                type="text"
-                placeholder="-180 … 180"
-                class="w-full"
-              />
-              <label for="add-model-lat">Latitude <span class="required">*</span></label>
-              <InputText
-                id="add-model-lat"
-                v-model="form.latitude"
-                type="text"
-                placeholder="-90 … 90"
-                class="w-full"
-              />
-              <label for="add-model-country">Country <span class="required">*</span></label>
-              <Select
-                id="add-model-country"
-                v-model="form.country"
-                :options="countryOptions"
-                option-label="label"
-                option-value="value"
-                placeholder="Select country"
-                class="w-full"
-              />
-              <label for="add-model-offset">Elevation offset (m)</label>
-              <InputText
-                id="add-model-offset"
-                v-model="form.offset"
-                type="text"
-                placeholder="0"
-                class="w-full"
-              />
-              <label for="add-model-heading">Heading (°)</label>
-              <InputText
-                id="add-model-heading"
-                v-model="form.heading"
-                type="text"
-                placeholder="0"
-                class="w-full"
-              />
-            </div>
-          </div>
+                <section class="form-section" aria-labelledby="add-model-section-files">
+                  <h2 id="add-model-section-files" class="form-section-title">Files</h2>
+                  <ul class="help-list-compact">
+                    <li>Same base name for <code>.ac</code> / <code>.xml</code> / <code>.png</code> files.</li>
+                    <li>PNG dimensions must be powers of 2. Thumbnail becomes 320×240 JPEG.</li>
+                  </ul>
+                  <div class="field-pair">
+                    <div class="field">
+                      <label for="add-model-ac3d" class="field-label">AC3D <span class="required">*</span></label>
+                      <div class="file-cell">
+                        <input id="add-model-ac3d" type="file" accept=".ac" @change="onAc3dChange" />
+                        <span class="file-name">{{ ac3dFileName || 'No file chosen' }}</span>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="add-model-thumb" class="field-label">Thumbnail <span class="required">*</span></label>
+                      <div class="file-cell">
+                        <input id="add-model-thumb" type="file" accept="image/*" @change="onThumbChange" />
+                        <span class="file-name">{{ thumbFileName || 'No file chosen' }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field-pair mt-field">
+                    <div class="field">
+                      <label for="add-model-xml" class="field-label">XML (optional)</label>
+                      <div class="file-cell">
+                        <input
+                          id="add-model-xml"
+                          type="file"
+                          accept=".xml,text/xml,application/xml"
+                          @change="onXmlChange"
+                        />
+                        <span class="file-name">{{ xmlFileName || 'None' }}</span>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="add-model-png" class="field-label">PNG texture(s)</label>
+                      <div class="file-cell">
+                        <input id="add-model-png" type="file" accept=".png,image/png" multiple @change="onPngChange" />
+                        <span class="file-name">{{ pngFileSummary }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
 
-          <!-- Step 2: Author & submit -->
-          <div v-show="currentStep === 2" class="step-panel">
-            <h2 class="mt-0">Author and license</h2>
-            <div class="form-grid">
-              <label for="add-model-author">Author <span class="required">*</span></label>
-              <Select
-                id="add-model-author"
-                v-model="form.authorId"
-                :options="authorOptions"
-                option-label="label"
-                option-value="value"
-                placeholder="Select author"
-                class="w-full"
-                @change="onAuthorChange"
-              />
-              <template v-if="form.authorId === '1'">
-                <label for="add-model-author-name">Your name <span class="required">*</span></label>
-                <InputText
-                  id="add-model-author-name"
-                  v-model="form.authorName"
-                  maxlength="50"
-                  placeholder="Full name"
-                  class="w-full"
-                />
-                <label for="add-model-author-email">Your email <span class="required">*</span></label>
-                <InputText
-                  id="add-model-author-email"
-                  v-model="form.authorEmail"
-                  type="email"
-                  maxlength="50"
-                  placeholder="email@example.com"
-                  class="w-full"
-                />
-              </template>
-              <template v-if="!auth.isAuthenticated">
-                <label for="add-model-contact-email" class="full-width">Your email (for this submission) <span class="required">*</span></label>
-                <InputText
-                  id="add-model-contact-email"
-                  v-model="form.contactEmail"
-                  type="email"
-                  maxlength="50"
-                  placeholder="email@example.com"
-                  class="w-full full-width"
-                />
-              </template>
-              <label for="add-model-comment" class="full-width">Comment (optional)</label>
-              <InputText
-                id="add-model-comment"
-                v-model="form.comment"
-                maxlength="100"
-                placeholder="Note for reviewers"
-                class="w-full full-width"
-              />
-              <div class="full-width flex align-items-center gap-2">
-                <input
-                  id="add-model-gpl"
-                  v-model="form.gplAccepted"
-                  type="checkbox"
-                  class="gpl-checkbox"
-                />
-                <label for="add-model-gpl" class="m-0">
-                  I release my contribution under the
-                  <a href="https://www.gnu.org/licenses/gpl-2.0.html" target="_blank" rel="noopener noreferrer">GNU GPL v2</a>.
-                </label>
+              <!-- Right: map + position -->
+              <div class="add-form-col add-form-col--map">
+                <section class="form-section" aria-labelledby="add-model-section-location">
+                  <h2 id="add-model-section-location" class="form-section-title">Location</h2>
+                  <p class="section-hint">Click the map or enter coordinates. Country is set from the database when you submit.</p>
+                  <div class="map-box">
+                    <ObjectMap
+                      :selection-mode="true"
+                      :selection-position="locationSelectionPosition"
+                      :initial-center="locationMapCenter"
+                      :initial-zoom="10"
+                      compact
+                      @position-select="onMapPositionSelect"
+                    />
+                    <span class="map-hint">Click on the map to place the marker</span>
+                  </div>
+                  <div class="field-pair mt-field">
+                    <div class="field">
+                      <label for="add-model-lon" class="field-label">Longitude <span class="required">*</span></label>
+                      <InputText
+                        id="add-model-lon"
+                        v-model="form.longitude"
+                        type="text"
+                        placeholder="-180 … 180"
+                        class="w-full"
+                      />
+                    </div>
+                    <div class="field">
+                      <label for="add-model-lat" class="field-label">Latitude <span class="required">*</span></label>
+                      <InputText
+                        id="add-model-lat"
+                        v-model="form.latitude"
+                        type="text"
+                        placeholder="-90 … 90"
+                        class="w-full"
+                      />
+                    </div>
+                  </div>
+                  <div class="field-pair mt-field">
+                    <div class="field">
+                      <label for="add-model-offset" class="field-label">Elevation offset (m)</label>
+                      <InputText id="add-model-offset" v-model="form.offset" type="text" placeholder="0" class="w-full" />
+                    </div>
+                    <div class="field">
+                      <label for="add-model-heading" class="field-label">Heading (°)</label>
+                      <InputText id="add-model-heading" v-model="form.heading" type="text" placeholder="0" class="w-full" />
+                    </div>
+                  </div>
+                </section>
               </div>
             </div>
-          </div>
 
-          <div class="step-actions mt-4">
-            <Button
-              v-if="currentStep > 0"
-              label="Back"
-              severity="secondary"
-              @click="currentStep--"
-            />
-            <span class="flex-1" />
-            <Button
-              v-if="currentStep < 2"
-              label="Next"
-              :disabled="!canProceed"
-              @click="currentStep++"
-            />
-            <Button
-              v-else
-              label="Submit model"
-              :loading="submitting"
-              :disabled="!canSubmit"
-              @click="submit"
-            />
+            <!-- Full width: author & license -->
+            <section class="form-section form-section--footer" aria-labelledby="add-model-section-author">
+              <h2 id="add-model-section-author" class="form-section-title">Author &amp; license</h2>
+              <div class="footer-inner">
+                <div class="footer-primary">
+                  <div class="field-pair">
+                    <div class="field">
+                      <label for="add-model-author" class="field-label">Author <span class="required">*</span></label>
+                      <Select
+                        id="add-model-author"
+                        v-model="form.authorId"
+                        :options="authorOptions"
+                        option-label="label"
+                        option-value="value"
+                        placeholder="Select author"
+                        class="w-full"
+                        @change="onAuthorChange"
+                      />
+                    </div>
+                    <div v-if="form.authorId === '1'" class="field">
+                      <label for="add-model-author-name" class="field-label">Your name <span class="required">*</span></label>
+                      <InputText
+                        id="add-model-author-name"
+                        v-model="form.authorName"
+                        maxlength="50"
+                        placeholder="Full name"
+                        class="w-full"
+                      />
+                    </div>
+                    <div v-else-if="!auth.isAuthenticated" class="field">
+                      <label for="add-model-contact-email" class="field-label">Contact email <span class="required">*</span></label>
+                      <InputText
+                        id="add-model-contact-email"
+                        v-model="form.contactEmail"
+                        type="email"
+                        maxlength="50"
+                        placeholder="email@example.com"
+                        class="w-full"
+                      />
+                    </div>
+                    <div v-else class="field field--spacer" aria-hidden="true" />
+                  </div>
+                  <div v-if="form.authorId === '1'" class="field-pair mt-field">
+                    <div class="field">
+                      <label for="add-model-author-email" class="field-label">Your email <span class="required">*</span></label>
+                      <InputText
+                        id="add-model-author-email"
+                        v-model="form.authorEmail"
+                        type="email"
+                        maxlength="50"
+                        placeholder="email@example.com"
+                        class="w-full"
+                      />
+                    </div>
+                    <div v-if="!auth.isAuthenticated" class="field">
+                      <label for="add-model-contact-email-row2" class="field-label">Contact email <span class="required">*</span></label>
+                      <InputText
+                        id="add-model-contact-email-row2"
+                        v-model="form.contactEmail"
+                        type="email"
+                        maxlength="50"
+                        placeholder="For follow-up on this submission"
+                        class="w-full"
+                      />
+                    </div>
+                    <div v-else class="field field--spacer" aria-hidden="true" />
+                  </div>
+                </div>
+                <div class="footer-secondary">
+                  <div class="field">
+                    <label for="add-model-comment" class="field-label">Comment (optional)</label>
+                    <InputText
+                      id="add-model-comment"
+                      v-model="form.comment"
+                      maxlength="100"
+                      placeholder="Note for reviewers"
+                      class="w-full"
+                    />
+                  </div>
+                  <div class="gpl-row">
+                    <input id="add-model-gpl" v-model="form.gplAccepted" type="checkbox" class="gpl-checkbox" />
+                    <label for="add-model-gpl" class="gpl-label m-0">
+                      I release my contribution under the
+                      <a href="https://www.gnu.org/licenses/gpl-2.0.html" target="_blank" rel="noopener noreferrer">GNU GPL v2</a>.
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div class="submit-bar">
+              <Button label="Submit model" :loading="submitting" :disabled="!canSubmit" @click="submit" />
+            </div>
           </div>
         </template>
       </Card>
@@ -265,7 +256,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Card from 'primevue/card'
 import Message from 'primevue/message'
 import InputText from 'primevue/inputtext'
@@ -277,8 +268,6 @@ import { useErrorDialog } from '@/composables/useErrorDialog'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
-const stepLabels = ['Model & files', 'Location', 'Author & submit']
-const currentStep = ref(0)
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 const success = ref(false)
 const successId = ref<number | null>(null)
@@ -294,7 +283,6 @@ const form = ref({
   contactEmail: '',
   longitude: '',
   latitude: '',
-  country: null as string | null,
   offset: '0',
   heading: '0',
   comment: '',
@@ -306,7 +294,6 @@ const xmlFile = ref<File | null>(null)
 const pngFiles = ref<File[]>([])
 
 const modelGroups = ref<{ id: number; name: string | null; path: string | null }[]>([])
-const countries = ref<{ code: string; name: string | null }[]>([])
 const authors = ref<{ id: number; name: string | null }[]>([])
 
 const ac3dFileName = computed(() => ac3dFile.value?.name ?? null)
@@ -323,12 +310,7 @@ const groupOptions = computed(() =>
     value: String(g.id),
   }))
 )
-const countryOptions = computed(() =>
-  (countries.value || []).map((c) => ({
-    label: c.name ? `${c.name} (${c.code})` : c.code,
-    value: c.code?.toLowerCase() ?? '',
-  }))
-)
+
 const authorOptions = computed(() => {
   const list = (authors.value || []).map((a) => ({
     label: a.name || `Author #${a.id}`,
@@ -352,64 +334,34 @@ const locationMapCenter = computed(() => {
   return [10, 53.5]
 })
 
-async function fetchCountryAtPosition(lat: number, lon: number) {
-  try {
-    const res = await fetch(auth.apiUrl(`/api/countries/at?lon=${encodeURIComponent(lon)}&lat=${encodeURIComponent(lat)}`), {
-      credentials: 'include',
-    })
-    if (!res.ok) return
-    const data = (await res.json()) as { country?: { code: string } | null }
-    if (data.country?.code) form.value.country = data.country.code.toLowerCase()
-  } catch {
-    // ignore
-  }
-}
-
 function onMapPositionSelect(p: { lat: number; lon: number }) {
   form.value.latitude = String(p.lat)
   form.value.longitude = String(p.lon)
-  fetchCountryAtPosition(p.lat, p.lon)
 }
 
-let countryLookupDebounce: ReturnType<typeof setTimeout> | null = null
-watch(
-  () => [form.value.latitude, form.value.longitude],
-  () => {
-    const pos = locationSelectionPosition.value
-    if (!pos) return
-    if (countryLookupDebounce) clearTimeout(countryLookupDebounce)
-    countryLookupDebounce = setTimeout(() => {
-      countryLookupDebounce = null
-      fetchCountryAtPosition(pos.lat, pos.lon)
-    }, 400)
-  }
-)
-
-const canProceed = computed(() => {
-  if (currentStep.value === 0) {
-    return (
-      (form.value.name?.trim().length ?? 0) > 0 &&
-      form.value.groupId != null &&
-      ac3dFile.value != null &&
-      thumbFile.value != null
-    )
-  }
-  if (currentStep.value === 1) {
-    const lon = Number(form.value.longitude)
-    const lat = Number(form.value.latitude)
-    return (
-      Number.isFinite(lon) && lon >= -180 && lon <= 180 &&
-      Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
-      (form.value.country?.trim().length ?? 0) > 0
-    )
-  }
-  return true
-})
-
 const canSubmit = computed(() => {
-  const hasContactEmail = auth.isAuthenticated && auth.user?.email
-    ? true
-    : (form.value.contactEmail?.trim().length ?? 0) > 0
+  if (
+    (form.value.name?.trim().length ?? 0) === 0 ||
+    form.value.groupId == null ||
+    ac3dFile.value == null ||
+    thumbFile.value == null
+  ) {
+    return false
+  }
+  const lon = Number(form.value.longitude)
+  const lat = Number(form.value.latitude)
+  if (
+    !Number.isFinite(lon) ||
+    lon < -180 ||
+    lon > 180 ||
+    !Number.isFinite(lat) ||
+    lat < -90 ||
+    lat > 90
+  ) {
+    return false
+  }
+  const hasContactEmail =
+    auth.isAuthenticated && auth.user?.email ? true : (form.value.contactEmail?.trim().length ?? 0) > 0
   if (!form.value.gplAccepted || !hasContactEmail) return false
   if (form.value.authorId !== '1') {
     return form.value.authorId != null
@@ -451,31 +403,30 @@ function applyLoggedInUserToAuthorStep() {
     form.value.authorEmail = u.email
     form.value.contactEmail = u.email
   }
-  // Match author by id, else by name (dropdown shows logged-in user when applicable)
   const matchById = authors.value.find((a) => a.id === u.id)
-  const matchByName = (u.name && authors.value.find((a) => (a.name || '').trim().toLowerCase() === (u.name || '').trim().toLowerCase())) ?? null
+  const matchByName =
+    (u.name &&
+      authors.value.find((a) => (a.name || '').trim().toLowerCase() === (u.name || '').trim().toLowerCase())) ??
+    null
   const match = matchById ?? matchByName
   if (match) form.value.authorId = String(match.id)
 }
 
 async function loadOptions() {
   try {
-    const [groupsRes, countriesRes, authorsRes] = await Promise.all([
+    const [groupsRes, authorsRes] = await Promise.all([
       fetch(auth.apiUrl('/api/modelgroups')),
-      fetch(auth.apiUrl('/api/countries')),
       fetch(auth.apiUrl('/api/authors?limit=5000')),
     ])
     if (groupsRes.ok) {
       const d = await groupsRes.json()
       modelGroups.value = d.groups ?? []
       if (form.value.groupId == null && modelGroups.value.length > 0) {
-        const staticGroup = modelGroups.value.find((g: { name?: string }) => g.name?.toLowerCase().includes('static'))
+        const staticGroup = modelGroups.value.find((g: { name?: string }) =>
+          g.name?.toLowerCase().includes('static')
+        )
         form.value.groupId = staticGroup ? String(staticGroup.id) : String(modelGroups.value[0].id)
       }
-    }
-    if (countriesRes.ok) {
-      const d = await countriesRes.json()
-      countries.value = d.countries ?? []
     }
     if (authorsRes.ok) {
       const d = await authorsRes.json()
@@ -498,7 +449,6 @@ async function submit() {
     fd.append('groupId', form.value.groupId ?? '1')
     fd.append('longitude', form.value.longitude.trim())
     fd.append('latitude', form.value.latitude.trim())
-    fd.append('country', (form.value.country ?? '').trim().toLowerCase().slice(0, 2))
     fd.append('offset', form.value.offset.trim() || '0')
     fd.append('heading', form.value.heading.trim() || '0')
     fd.append('comment', form.value.comment.trim())
@@ -542,115 +492,168 @@ onMounted(async () => {
 
 <style scoped>
 .add-model-view {
-  max-width: 42rem;
+  max-width: min(112rem, 100%);
+  margin-inline: auto;
+  padding-inline: clamp(0.5rem, 2vw, 1rem);
 }
-.stepper {
+.intro-lead {
+  margin-bottom: 1.25rem;
+  max-width: 50rem;
+}
+.add-form-shell {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.25rem;
+  flex-direction: column;
+  gap: 1.5rem;
 }
-.stepper-item {
+.add-form-columns {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (min-width: 960px) {
+  .add-form-columns {
+    grid-template-columns: 1fr minmax(18rem, 42%);
+  }
+}
+.add-form-col--main {
+  min-width: 0;
+}
+.add-form-col--map {
+  min-width: 0;
+}
+.form-section {
   display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  flex-direction: column;
+  gap: 0.75rem;
 }
-.stepper-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  background: var(--p-surface-200);
-  color: var(--p-text-color);
+.form-section-title {
+  margin: 0;
+  font-size: 1.125rem;
   font-weight: 600;
-  font-size: 0.875rem;
+  color: var(--p-text-color);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--p-surface-200);
 }
-.stepper-item.active .stepper-num {
-  background: var(--p-primary-color);
-  color: var(--p-primary-contrast-color);
-}
-.stepper-item.done .stepper-num {
-  background: var(--p-surface-400);
-  color: var(--p-surface-0);
-}
-.stepper-sep {
-  width: 1.5rem;
-  height: 2px;
-  background: var(--p-surface-300);
-  margin: 0 0.25rem;
-}
-.stepper-label {
+.section-hint {
+  margin: -0.25rem 0 0;
   font-size: 0.875rem;
   color: var(--p-text-color-secondary);
 }
-.stepper-item.active .stepper-label {
-  color: var(--p-text-color);
-  font-weight: 600;
+.field-pair {
+  display: grid;
+  gap: 0.75rem 1rem;
+  align-items: start;
 }
-.step-panel {
-  min-height: 12rem;
+@media (min-width: 640px) {
+  .field-pair {
+    grid-template-columns: 1fr 1fr;
+  }
 }
-.location-map-wrap {
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.field--spacer {
+  visibility: hidden;
+  min-height: 0;
+}
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--p-text-color-secondary);
+}
+.mt-field {
+  margin-top: 0.25rem;
+}
+.map-box {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  border-radius: var(--p-border-radius, 6px);
+  overflow: hidden;
+  border: 1px solid var(--p-surface-200);
+  min-height: 220px;
 }
-.location-map-hint {
-  font-size: 0.875rem;
+@media (min-width: 960px) {
+  .map-box {
+    min-height: min(340px, 42vh);
+  }
+}
+.map-hint {
+  font-size: 0.8125rem;
+  color: var(--p-text-color-secondary);
+  padding: 0 0.5rem 0.5rem;
+}
+.help-list-compact {
+  margin: 0 0 0.5rem;
+  padding-left: 1.15rem;
+  font-size: 0.8125rem;
   color: var(--p-text-color-secondary);
 }
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 0.75rem 1rem;
-  align-items: center;
+.help-list-compact li {
+  margin-bottom: 0.2rem;
 }
-.form-grid label {
-  justify-self: end;
-}
-.form-grid .full-width,
-.form-grid label.full-width {
-  grid-column: 1 / -1;
-}
-.form-grid label.full-width {
-  justify-self: start;
+.help-list-compact code {
+  font-size: 0.85em;
+  padding: 0.08em 0.3em;
+  border-radius: 4px;
+  background: var(--p-surface-200);
 }
 .file-cell {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
-.file-cell input[type="file"] {
-  font-size: 0.875rem;
+.file-cell input[type='file'] {
+  font-size: 0.8125rem;
+  max-width: 100%;
 }
 .file-name {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--p-text-color-secondary);
+  word-break: break-all;
 }
-.help-list {
-  padding-left: 1.25rem;
-  margin: 0;
+.form-section--footer .footer-inner {
+  display: grid;
+  gap: 1.25rem;
 }
-.help-list li {
-  margin-bottom: 0.25rem;
+@media (min-width: 900px) {
+  .form-section--footer .footer-inner {
+    grid-template-columns: 1fr minmax(14rem, 34%);
+    align-items: start;
+  }
 }
-.help-list code {
-  font-size: 0.875em;
-  padding: 0.1em 0.35em;
-  border-radius: 4px;
-  background: var(--p-surface-100);
+.footer-primary {
+  min-width: 0;
+}
+.footer-secondary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.gpl-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.gpl-checkbox {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+.gpl-label {
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.submit-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--p-surface-200);
 }
 .required {
   color: var(--p-danger-color);
-}
-.step-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.flex-1 {
-  flex: 1;
 }
 </style>

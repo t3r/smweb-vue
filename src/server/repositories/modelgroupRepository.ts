@@ -18,7 +18,7 @@ export async function findAll(): Promise<ModelGroupRow[]> {
 }
 
 export async function existsById(id: number): Promise<boolean> {
-  if (!Number.isInteger(id) || id < 1) return false
+  if (!Number.isInteger(id) || id < 0) return false
   const rows = await sequelize.query(
     `SELECT 1 AS ok FROM fgs_modelgroups WHERE mg_id = :id LIMIT 1`,
     { replacements: { id }, type: QueryTypes.SELECT }

@@ -218,7 +218,6 @@ export async function validateModelAddFormFields(input: {
   authorNew?: { name: string; email: string } | null
   latitudeRaw: string
   longitudeRaw: string
-  countryRaw: string
   offsetRaw: string | null | undefined
   headingRaw: string | null | undefined
 }): Promise<string | null> {
@@ -232,7 +231,6 @@ export async function validateModelAddFormFields(input: {
     authorNew,
     latitudeRaw,
     longitudeRaw,
-    countryRaw,
     offsetRaw,
     headingRaw,
   } = input
@@ -254,7 +252,7 @@ export async function validateModelAddFormFields(input: {
     return 'Please enter a valid email address (max 50 characters).'
   }
 
-  if (!Number.isInteger(groupId) || groupId < 1 || !RE_MODEL_GROUP_ID.test(String(groupId))) {
+  if (!Number.isInteger(groupId) || groupId < 0 || !RE_MODEL_GROUP_ID.test(String(groupId))) {
     return 'Please select a valid model family.'
   }
   if (!(await modelgroupRepo.existsById(groupId))) {
@@ -282,11 +280,6 @@ export async function validateModelAddFormFields(input: {
   const lon = Number(longitudeRaw)
   if (!isLatitude(lat, latitudeRaw)) return 'Latitude is invalid (must be between -90 and 90).'
   if (!isLongitude(lon, longitudeRaw)) return 'Longitude is invalid (must be between -180 and 180).'
-
-  const country = countryRaw.trim()
-  if (!country || !/^[a-zA-Z]{1,3}$/.test(country)) {
-    return 'Country code must be 1–3 letters.'
-  }
 
   const offStr = offsetRaw != null && offsetRaw !== '' ? String(offsetRaw).trim() : ''
   if (offStr !== '') {

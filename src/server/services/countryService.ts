@@ -21,3 +21,11 @@ export async function getCountryAt(
   const country = await countryRepo.findCountryAt(longitude, latitude)
   return { country }
 }
+
+/** Two-letter country code from GIS at WGS84 coordinates, or null (ocean / gaps). */
+export async function resolveCountryCodeAt(longitude: number, latitude: number): Promise<string | null> {
+  const { country } = await getCountryAt(longitude, latitude)
+  if (!country?.code) return null
+  const c = String(country.code).trim().toLowerCase().slice(0, 2)
+  return c.length === 2 ? c : null
+}

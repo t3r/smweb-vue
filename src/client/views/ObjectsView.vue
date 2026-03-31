@@ -6,6 +6,12 @@
     </div>
     <p class="text-color-secondary mb-4">Browse object positions. Use the row filters for description, type, and country.</p>
 
+    <p v-if="filterModelId" class="model-scope-banner mb-3">
+      Showing placements that use
+      <router-link :to="`/models/${filterModelId}`">model #{{ filterModelId }}</router-link>.
+      <router-link :to="{ path: '/objects', query: queryWithoutModel }" class="scope-clear">Clear model filter</router-link>
+    </p>
+
     <DataTable
       v-model:filters="filters"
       :value="objects"
@@ -139,6 +145,18 @@ const total = ref(0)
 const objectIdsWithPending = computed(() =>
   new Set((objects.value || []).filter((o: { hasPendingRequest?: boolean }) => o.hasPendingRequest === true).map((o: { id: number }) => o.id))
 )
+/** Objects list filtered by model id (?model=) from URL / router-link */
+const filterModelId = ref<string | null>(null)
+
+const queryWithoutModel = computed(() => {
+  const q: Record<string, string> = {}
+  for (const [k, v] of Object.entries(route.query)) {
+    if (k === 'model') continue
+    if (v == null) continue
+    q[k] = Array.isArray(v) ? String(v[0]) : String(v)
+  }
+  return q
+})
 const offset = ref(0)
 const limit = 20
 const sortField = ref('lastUpdated')
@@ -181,6 +199,8 @@ function syncFiltersFromRoute() {
   filters.value.description.value = q.description ? String(q.description) : null
   filters.value.type.value = q.group ? String(q.group) : null
   filters.value.country.value = q.country ? String(q.country).trim().toLowerCase() || null : null
+  const m = q.model
+  filterModelId.value = m != null && String(m).trim() !== '' ? String(m).trim() : null
 }
 
 function syncRouteFromFilters() {
@@ -191,6 +211,8 @@ function syncRouteFromFilters() {
   if (g != null && g !== '') query.group = String(g)
   const c = filters.value.country?.value
   if (c && String(c).trim()) query.country = String(c).trim().toLowerCase()
+  const mid = filterModelId.value
+  if (mid != null && mid !== '') query.model = String(mid)
   router.replace({ path: '/objects', query }).catch(() => {})
 }
 
@@ -333,6 +355,8 @@ async function fetchObjects() {
     if (groupVal != null && String(groupVal) !== '') params.set('group', String(groupVal))
     const countryVal = filters.value.country?.value
     if (countryVal && String(countryVal).trim()) params.set('country', String(countryVal).trim().toLowerCase())
+    const modelVal = filterModelId.value
+    if (modelVal != null && String(modelVal).trim() !== '') params.set('model', String(modelVal).trim())
     if (sortField.value) params.set('sortField', sortField.value)
     if (sortOrder.value !== null && sortOrder.value !== undefined) params.set('sortOrder', String(sortOrder.value))
     const res = await fetch(`/api/objects?${params}`)
@@ -376,4 +400,17 @@ onMounted(async () => {
 .pending-icon { font-size: 0.875rem; color: var(--p-primary-color); }
 .gap-3 { gap: 0.75rem; }
 .objects-import-link { font-weight: 500; }
+.model-scope-banner {
+  margin: 0;
+  font-size: 0.9375rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: var(--p-surface-100);
+  border: 1px solid var(--p-surface-200);
+}
+.model-scope-banner .scope-clear {
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
 </style>

@@ -56,7 +56,7 @@ async function validTarGz(baseName, { withXml = true } = {}) {
 }
 
 beforeEach(() => {
-  vi.mocked(modelgroupRepo.existsById).mockImplementation((id) => Promise.resolve(Number(id) === 1))
+  vi.mocked(modelgroupRepo.existsById).mockImplementation((id) => Promise.resolve([0, 1].includes(Number(id))))
 })
 
 function jsonBody(overrides = {}) {
@@ -69,7 +69,6 @@ function jsonBody(overrides = {}) {
     groupId: 1,
     longitude: 8.5,
     latitude: 52.0,
-    country: 'de',
     offset: '',
     heading: 0,
     gplAccepted: true,
@@ -245,7 +244,6 @@ describe('POST /api/submissions/models/upload (multipart)', () => {
       .field('email', 'sub@example.com')
       .field('latitude', '52')
       .field('longitude', '8')
-      .field('country', 'de')
       .field('offset', '')
       .field('heading', '0')
       .field('groupId', '1')
@@ -269,7 +267,6 @@ describe('POST /api/submissions/models/upload (multipart)', () => {
       .field('email', 'a@b.co')
       .field('latitude', '0')
       .field('longitude', '0')
-      .field('country', 'us')
       .field('groupId', '1')
       .field('authorId', '2')
       .field('gplAccepted', 'true')
@@ -290,7 +287,6 @@ describe('POST /api/submissions/models/upload (multipart)', () => {
       .field('email', 'a@b.co')
       .field('latitude', '0')
       .field('longitude', '0')
-      .field('country', 'us')
       .field('groupId', '1')
       .field('authorId', '2')
       .field('gplAccepted', 'true')
@@ -312,7 +308,6 @@ describe('POST /api/submissions/models/upload (multipart)', () => {
       .field('email', 'a@b.co')
       .field('latitude', '0')
       .field('longitude', '0')
-      .field('country', 'us')
       .field('groupId', '1')
       .field('authorId', '2')
       .field('gplAccepted', 'true')
@@ -332,7 +327,6 @@ describe('POST /api/submissions/models/upload (multipart)', () => {
       .field('email', 'a@b.co')
       .field('latitude', '0')
       .field('longitude', '0')
-      .field('country', 'us')
       .field('groupId', '1')
       .field('authorId', '2')
       .field('gplAccepted', 'true')
@@ -351,7 +345,6 @@ describe('POST /api/submissions/models/upload (multipart)', () => {
       .field('email', 'a@b.co')
       .field('latitude', '0')
       .field('longitude', '0')
-      .field('country', 'us')
       .field('groupId', '1')
       .field('authorId', '2')
       .field('gplAccepted', 'true')
@@ -371,7 +364,6 @@ describe('POST /api/submissions/models/upload (multipart)', () => {
       .field('email', 'a@b.co')
       .field('latitude', '0')
       .field('longitude', '0')
-      .field('country', 'us')
       .field('groupId', '1')
       .field('authorId', '2')
       .field('gplAccepted', 'true')
@@ -400,7 +392,6 @@ describe('POST /api/submissions/models/upload (multipart)', () => {
         .field('email', 'a@b.co')
         .field('latitude', '0')
         .field('longitude', '0')
-        .field('country', 'us')
         .field('groupId', '1')
         .field('authorId', '2')
         .field('gplAccepted', 'true')

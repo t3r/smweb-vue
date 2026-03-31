@@ -74,6 +74,7 @@ vi.mock('../../src/server/services/countryService.ts', () => ({
     ],
   }),
   getCountryAt: vi.fn().mockResolvedValue({ country: { code: 'de', name: 'Germany' } }),
+  resolveCountryCodeAt: vi.fn().mockResolvedValue('de'),
 }))
 
 vi.mock('../../src/server/services/objectService.ts', () => ({
@@ -110,7 +111,7 @@ vi.mock('../../src/server/services/statisticsService.ts', () => ({
 
 vi.mock('../../src/server/repositories/modelgroupRepository.ts', () => ({
   findAll: vi.fn().mockResolvedValue([{ id: 1, name: 'Static', path: 'Static' }]),
-  existsById: vi.fn().mockImplementation((id) => Promise.resolve(Number(id) === 1)),
+  existsById: vi.fn().mockImplementation((id) => Promise.resolve([0, 1].includes(Number(id)))),
 }))
 
 vi.mock('../../src/server/repositories/countryRepository.ts', () => ({
