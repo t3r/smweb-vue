@@ -1,0 +1,81 @@
+# End-to-end pipeline scaffold (PostGIS + env + Node + DB readiness).
+# Later steps: DB init, build, start server, Playwright.
+
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scenemodels_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d scenemodels_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+
+    env:
+      NODE_ENV: production
+      PORT: '3000'
+      # Must match the URL the browser will use (single-origin SPA + API).
+      FRONTEND_URL: http://127.0.0.1:3000
+      # production session middleware requires length >= 32
+      SESSION_SECRET: e2e-ci-session-secret-must-be-32-chars-min
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/scenemodels_e2e
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_NAME: scenemodels_e2e
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install PostgreSQL client (pg_isready)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Wait for PostgreSQL
+        run: |
+          set -e
+          for i in $(seq 1 60); do
+            if pg_isready -h localhost -p 5432 -U postgres -d scenemodels_e2e; then
+              echo "PostgreSQL is ready."
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL... ($i/60)"
+            sleep 2
+          done
+          echo "PostgreSQL did not become ready in time."
+          exit 1
+
+      - name: Sanity check toolchain
+        run: |
+          node -v
+          npm -v
+          echo "DATABASE_URL host=localhost (mapped from PostGIS service)"
