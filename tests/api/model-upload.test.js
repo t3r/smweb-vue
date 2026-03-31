@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
+/** Must run before any import of modelUploadValidation (below) or vi.mock graphs miss on CI. */
+import '../helpers/mocks.js'
 import request from 'supertest'
 import sharp from 'sharp'
 import { buildTarGz } from '../../src/server/utils/buildTarGz.ts'

@@ -1,7 +1,8 @@
 /**
  * Database layer mocks for API tests. Import this before the app so controllers
  * use mock data and no real DB is required.
- * Use `.ts` paths so Vitest matches the same modules as the app (Vite resolves .js imports to .ts).
+ * `tests/api/model-upload.test.js` imports modelUploadValidation before `app.js` runs; it must
+ * `import '../helpers/mocks.js'` first or repos load real and CI hits SequelizeConnectionRefused.
  */
 import { vi } from 'vitest'
 
