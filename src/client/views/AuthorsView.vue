@@ -22,36 +22,35 @@
       @page="onPage"
       @sort="onSort"
     >
-      <Column field="id" header="ID" style="width: 5rem" sortable filter-field="id">
-        <template #filter> </template>
+      <Column field="id" header="ID" style="width: 5rem" sortable>
         <template #body="{ data }">
           <router-link :to="`/authors/${data.id}`">#{{ data.id }}</router-link>
         </template>
       </Column>
-      <Column field="name" header="Name" sortable filter-field="name">
-        <template #filter="{ filterModel }">
+      <Column field="name" header="Name" sortable filter-field="name" :show-filter-menu="false">
+        <template #filter="{ filterModel, filterCallback }">
           <InputText
             v-model="filterModel.value"
             type="text"
             placeholder="Search name"
             class="w-full"
-            @keydown.enter.prevent="applyStringFilters"
-            @blur="applyStringFilters"
+            @keydown.enter.prevent="applyAuthorsTextFilter(filterCallback)"
+            @blur="applyAuthorsTextFilter(filterCallback)"
           />
         </template>
         <template #body="{ data }">
           <router-link :to="`/authors/${data.id}`">{{ data.name || 'Unnamed' }}</router-link>
         </template>
       </Column>
-      <Column field="description" header="Description" sortable filter-field="description">
-        <template #filter="{ filterModel }">
+      <Column field="description" header="Description" sortable filter-field="description" :show-filter-menu="false">
+        <template #filter="{ filterModel, filterCallback }">
           <InputText
             v-model="filterModel.value"
             type="text"
             placeholder="Search description"
             class="w-full"
-            @keydown.enter.prevent="applyStringFilters"
-            @blur="applyStringFilters"
+            @keydown.enter.prevent="applyAuthorsTextFilter(filterCallback)"
+            @blur="applyAuthorsTextFilter(filterCallback)"
           />
         </template>
         <template #body="{ data }">{{ truncate(data.description) }}</template>
@@ -71,9 +70,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
+
+const route = useRoute()
+const router = useRouter()
 
 const authors = ref([])
 const total = ref(0)
@@ -82,24 +85,50 @@ const limit = 20
 const sortField = ref('name')
 const sortOrder = ref(1)
 const filters = ref({
-  id: { value: null, matchMode: 'contains' },
-  name: { value: null, matchMode: 'contains' },
-  description: { value: null, matchMode: 'contains' },
+  name: { value: null as string | null, matchMode: 'contains' },
+  description: { value: null as string | null, matchMode: 'contains' },
 })
 const loading = ref(true)
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 
-function truncate(str) {
+function truncate(str: unknown) {
   if (!str || typeof str !== 'string') return '—'
   const s = str.trim()
   if (s.length <= 60) return s || '—'
-  return s.slice(0, 60) + '…'
+  return `${s.slice(0, 60)}…`
 }
 
-function applyStringFilters() {
-  offset.value = 0
-  fetchAuthors()
+function syncFiltersFromRoute() {
+  const q = route.query
+  filters.value.name.value = q.name ? String(q.name) : null
+  filters.value.description.value = q.description ? String(q.description) : null
 }
+
+function syncRouteFromFilters() {
+  const query: Record<string, string> = {}
+  const n = filters.value.name?.value
+  if (n && String(n).trim()) query.name = String(n).trim()
+  const d = filters.value.description?.value
+  if (d && String(d).trim()) query.description = String(d).trim()
+  router.replace({ path: '/authors', query }).catch(() => {})
+}
+
+/** Same pattern as Objects list: contains search, apply on Enter/blur via DataTable filter callback + URL sync. */
+function applyAuthorsTextFilter(filterCallback?: () => void) {
+  filterCallback?.()
+  offset.value = 0
+  syncRouteFromFilters()
+}
+
+watch(
+  () => ({ ...route.query }),
+  () => {
+    syncFiltersFromRoute()
+    offset.value = 0
+    fetchAuthors()
+  },
+  { deep: true }
+)
 
 async function fetchAuthors() {
   loading.value = true
@@ -126,12 +155,12 @@ async function fetchAuthors() {
   }
 }
 
-function onPage(event) {
+function onPage(event: { first: number }) {
   offset.value = event.first
   fetchAuthors()
 }
 
-function onSort(event) {
+function onSort(event: { sortField?: string; sortOrder?: number }) {
   sortField.value = event.sortField ?? 'name'
   sortOrder.value = event.sortOrder ?? 1
   offset.value = 0
@@ -139,6 +168,7 @@ function onSort(event) {
 }
 
 onMounted(() => {
+  syncFiltersFromRoute()
   fetchAuthors()
 })
 </script>
