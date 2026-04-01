@@ -31,7 +31,17 @@
         Data on this site is licensed under
         <a href="https://www.gnu.org/licenses/gpl-2.0.html" target="_blank" rel="noopener noreferrer">GPL-2.0+</a>.
         Copyright of each model is owned by the author. Website by and © Torsten Dreyer.
-        <span class="site-footer-version">Version-Tag: {{ gitSlug }}</span>
+        <span class="site-footer-version">
+          Version-Tag:
+          <a
+            v-if="gitCommitUrl"
+            :href="gitCommitUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ gitSlug }}</a
+          >
+          <template v-else>{{ gitSlug }}</template>
+        </span>
       </p>
     </footer>
   </div>
@@ -48,6 +58,16 @@ const auth = useAuthStore()
 const loginMenuRef = ref(null)
 
 const gitSlug = typeof __FGS_GIT_SLUG__ !== 'undefined' ? __FGS_GIT_SLUG__ : 'dev'
+const repoWebUrl =
+  typeof __FGS_REPO_WEB_URL__ !== 'undefined' ? __FGS_REPO_WEB_URL__.replace(/\/$/, '') : ''
+
+/** GitHub (etc.) /commit/&lt;sha&gt; only when the slug looks like a revision id, not e.g. `dev`. */
+function isGitCommitSlug(s: string): boolean {
+  return /^[0-9a-f]{7,40}$/i.test(s)
+}
+
+const gitCommitUrl =
+  repoWebUrl && isGitCommitSlug(gitSlug) ? `${repoWebUrl}/commit/${gitSlug}` : null
 
 const navItems = computed(() => {
   const items = [

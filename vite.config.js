@@ -1,13 +1,31 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { resolve } from 'path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { resolveGitSlug } from './scripts/resolve-git-slug.mjs'
 
+const projectRoot = dirname(fileURLToPath(import.meta.url))
+const pkg = JSON.parse(readFileSync(resolve(projectRoot, 'package.json'), 'utf8'))
+
+/** HTTPS origin for GitHub (or other) repo page; used for /commit/&lt;sha&gt; links in the footer. */
+function repoWebUrl(repository) {
+  let u = repository && typeof repository === 'object' ? repository.url : ''
+  if (typeof u !== 'string') u = ''
+  u = u.replace(/^git\+/i, '').replace(/\.git$/i, '')
+  if (u.startsWith('git@github.com:')) {
+    u = `https://github.com/${u.slice('git@github.com:'.length)}`
+  }
+  return u || 'https://github.com/t3r/smweb-vue'
+}
+
 const appGitSlug = resolveGitSlug()
+const appRepoWebUrl = repoWebUrl(pkg.repository)
 
 export default defineConfig({
   define: {
     __FGS_GIT_SLUG__: JSON.stringify(appGitSlug),
+    __FGS_REPO_WEB_URL__: JSON.stringify(appRepoWebUrl),
   },
   plugins: [vue()],
   root: 'src/client',
@@ -27,8 +45,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src/client'),
-      '@shared': resolve(__dirname, 'src/shared')
+      '@': resolve(projectRoot, 'src/client'),
+      '@shared': resolve(projectRoot, 'src/shared')
     }
   }
 })

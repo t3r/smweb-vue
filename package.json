@@ -2,6 +2,10 @@
   "name": "flightgear-scenemodels",
   "version": "1.0.0",
   "description": "FlightGear Scenemodels - Unified Full-Stack Application",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/t3r/smweb-vue.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
