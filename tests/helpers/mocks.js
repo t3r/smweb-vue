@@ -160,3 +160,24 @@ vi.mock('../../src/server/repositories/requestRepository.ts', () => ({
 vi.mock('../../src/server/services/requestExecutor.ts', () => ({
   executeRequest: vi.fn().mockResolvedValue(undefined),
 }))
+
+vi.mock('../../src/server/services/airportLookupService.ts', () => ({
+  parseIcaoParam: vi.fn((raw) => {
+    const t = String(raw ?? '')
+      .trim()
+      .toUpperCase()
+    return /^[A-Z0-9]{3,4}$/.test(t) ? t : null
+  }),
+  getPositionByIcao: vi.fn().mockImplementation((icao) =>
+    icao === 'EDDF'
+      ? Promise.resolve({
+          icao: 'EDDF',
+          name: 'Frankfurt Main Airport',
+          latitude: 50.026706,
+          longitude: 8.55835,
+          airportType: 'large_airport',
+          ourAirportsId: 2212,
+        })
+      : Promise.resolve(null)
+  ),
+}))

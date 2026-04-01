@@ -9,6 +9,7 @@ import statisticsRouter from './statistics.js'
 import positionRequestsRouter from './positionRequests.js'
 import newsRouter from './news.js'
 import emailQueueRouter from './emailQueue.js'
+import airportsRouter from './airports.js'
 
 const router = express.Router()
 
@@ -22,5 +23,6 @@ router.use('/submissions', submissionsRouter)
 router.use('/statistics', statisticsRouter)
 router.use('/position-requests', positionRequestsRouter)
 router.use('/email-queue', emailQueueRouter)
+router.use('/airports', airportsRouter)
 
 export default router

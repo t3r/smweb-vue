@@ -8,6 +8,28 @@
     }"
   >
     <div ref="containerRef" class="object-map-maplibre-root"></div>
+    <div v-if="showAirportIcaoSearch" class="map-airport-search">
+      <form class="map-airport-search__form" @submit.prevent="goToAirportIcao">
+        <InputText
+          v-model="icaoInput"
+          type="text"
+          maxlength="4"
+          placeholder="ICAO"
+          size="small"
+          class="map-airport-search__input"
+          :disabled="airportSearchLoading"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          aria-label="Airport ICAO code"
+          @input="onIcaoFieldInput"
+        />
+
+      </form>
+      <div v-if="airportSearchError" class="map-airport-search__msg map-airport-search__msg--err" role="alert">
+        {{ airportSearchError }}
+      </div>
+    </div>
     <div
       v-if="pointerReadout"
       class="map-pointer-readout"
@@ -78,6 +100,8 @@ function historyKeyFromRounded(r: { lng: number; lat: number; zoom: number }) {
 }
 const FIT_PADDING = 60
 const FIT_MAX_ZOOM = 14
+/** Zoom after flying to an airport from ICAO lookup. */
+const AIRPORT_ICAO_FLY_ZOOM = 13
 const VIEWPORT_FETCH_DEBOUNCE_MS = 300
 const MAP_FETCH_LIMIT = 2000
 /** Don't request objects when zoomed out beyond this (avoids globe-sized bbox). */
@@ -126,6 +150,10 @@ const props = defineProps({
   selectionDraggable: { type: Boolean, default: false },
   /** Current selected position to show as a marker when selectionMode is true. { lat, lon } or null */
   selectionPosition: { type: Object, default: null },
+  /** Top-left ICAO field: fetch position from airport API and fly the map there. */
+  showAirportIcaoSearch: { type: Boolean, default: false },
+  /** Base path without trailing ICAO (e.g. /api/airports/by-icao). */
+  airportLookupBasePath: { type: String, default: '/api/airports/by-icao' },
 })
 
 const emit = defineEmits(['object-click', 'position-select', 'view-change'])
@@ -134,6 +162,59 @@ const containerRef = ref(null)
 
 /** Bottom-left readout while cursor is over the map (mousemove). */
 const pointerReadout = ref(null)
+
+const icaoInput = ref('')
+const airportSearchLoading = ref(false)
+const airportSearchError = ref('')
+
+function onIcaoFieldInput(e: Event) {
+  airportSearchError.value = ''
+  const el = e.target as HTMLInputElement | null
+  if (!el) return
+  const next = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
+  if (icaoInput.value !== next) icaoInput.value = next
+}
+
+async function goToAirportIcao() {
+  airportSearchError.value = ''
+  const raw = icaoInput.value.trim().toUpperCase()
+  if (!/^[A-Z0-9]{3,4}$/.test(raw)) {
+    airportSearchError.value = 'Enter a 3–4 character ICAO code.'
+    return
+  }
+  if (!map) return
+  airportSearchLoading.value = true
+  try {
+    const base = String(props.airportLookupBasePath || '/api/airports/by-icao').replace(/\/$/, '')
+    const res = await fetch(`${base}/${encodeURIComponent(raw)}`, {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+    if (res.status === 404) {
+      airportSearchError.value = 'Airport not found.'
+      return
+    }
+    if (!res.ok) {
+      airportSearchError.value = 'Could not look up airport.'
+      return
+    }
+    const data = (await res.json()) as { longitude?: unknown; latitude?: unknown }
+    const lng = Number(data.longitude)
+    const lat = Number(data.latitude)
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      airportSearchError.value = 'Invalid response from server.'
+      return
+    }
+    map.flyTo({
+      center: [wrapLongitude(lng), clampLatitude(lat)],
+      zoom: Math.min(19, AIRPORT_ICAO_FLY_ZOOM),
+    })
+  } catch {
+    airportSearchError.value = 'Network error.'
+  } finally {
+    airportSearchLoading.value = false
+  }
+}
 
 function wrapLongitude(lng: number): number {
   let x = lng
@@ -896,5 +977,69 @@ onBeforeUnmount(() => {
 }
 .object-map-draggable-selection :deep(.maplibregl-marker:active) {
   cursor: grabbing;
+}
+
+.map-airport-search {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(200px, calc(100% - 80px));
+  pointer-events: auto;
+  opacity: 0.88;
+  transition: opacity 0.15s ease;
+}
+.map-airport-search:hover,
+.map-airport-search:focus-within {
+  opacity: 1;
+}
+.map-airport-search__form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px 3px 6px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  backdrop-filter: blur(5px);
+}
+/* InputText root is the <input> (custom class merged onto the same node). */
+.map-airport-search__input {
+  flex: 1;
+  min-width: 0;
+  width: 4.25rem;
+  padding: 0.2rem 0.35rem !important;
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
+  font-size: 0.7rem;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #334155;
+}
+.map-airport-search__input:enabled:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(100, 116, 139, 0.35) !important;
+}
+.map-airport-search__input::placeholder {
+  color: rgba(100, 116, 139, 0.65);
+}
+.map-airport-search__msg {
+  padding: 4px 7px;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: #475569;
+  background: rgba(255, 255, 255, 0.62);
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(4px);
+}
+.map-airport-search__msg--err {
+  color: #9f1239;
+  border-color: rgba(244, 63, 94, 0.22);
+  background: rgba(255, 241, 242, 0.75);
 }
 </style>

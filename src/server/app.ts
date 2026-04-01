@@ -16,6 +16,7 @@ import { sequelize } from './config/database.js'
 import { perIpLimiter, perSessionLimiter } from './middleware/rateLimit.js'
 import { CLIENT_ERROR_MESSAGE } from './utils/dbFallback.js'
 import { getClientBuildId } from './utils/clientBuildId.js'
+import { startOurAirportsSyncScheduler } from './services/ourAirportsSync.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -160,6 +161,7 @@ if (isMainModule) {
     const hostForUrl = LISTEN_HOST.includes(':') ? `[${LISTEN_HOST}]` : LISTEN_HOST
     console.log(`Server listening on http://${hostForUrl}:${listenPort}`)
     console.log(`API docs: http://${hostForUrl}:${listenPort}/api-docs`)
+    startOurAirportsSyncScheduler()
   })
 }
 
