@@ -80,7 +80,7 @@ const navItems = computed(() => {
     { label: 'About', command: () => router.push('/about') },
   ]
   if (auth.isReviewer) {
-    items.push({ label: 'Position requests', command: () => router.push('/position-requests') })
+    items.push({ label: 'Pending requests', command: () => router.push('/position-requests') })
   }
   items.push({
       label: 'Old Site',

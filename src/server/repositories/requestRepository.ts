@@ -145,6 +145,7 @@ export interface PendingItem {
   comment: string
   details: unknown
   authorId?: number | null
+  authorName?: string | null
 }
 
 export interface FailedItem {
@@ -180,10 +181,12 @@ export async function getPendingRequests(): Promise<{ ok: PendingItem[]; failed:
       failed.push({ id: row.spr_id, sig: row.spr_hash, error: msg })
     }
   }
-  const emailToAuthorId = await authorRepo.findAuthorIdsByEmails(emails)
+  const authorByEmail = await authorRepo.findAuthorsByEmails(emails)
   for (const item of ok) {
     const key = item.email != null ? String(item.email).trim().toLowerCase() : null
-    item.authorId = key != null ? (emailToAuthorId.get(key) ?? null) : null
+    const info = key != null ? authorByEmail.get(key) : undefined
+    item.authorId = info?.id ?? null
+    item.authorName = info?.name ?? null
   }
   return { ok, failed }
 }

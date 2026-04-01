@@ -7,7 +7,7 @@ export async function getList(req: Request, res: Response): Promise<void> {
   try {
     const { ok, failed } = await requestRepo.getPendingRequests()
     res.json({
-      pending: ok.map(({ id, sig, type, email, comment, details, authorId }) => ({
+      pending: ok.map(({ id, sig, type, email, comment, details, authorId, authorName }) => ({
         id,
         sig,
         type,
@@ -15,6 +15,7 @@ export async function getList(req: Request, res: Response): Promise<void> {
         comment,
         details,
         authorId: authorId ?? null,
+        authorName: authorName ?? null,
       })),
       failed: failed.map(({ id, sig, error }) => ({ id, sig, error })),
     })

@@ -66,21 +66,27 @@ export async function findAuthorByEmail(email: string): Promise<{ id: number; na
   return { id: r.id, name: (r.name != null ? String(r.name).trim() : '') || email }
 }
 
-export async function findAuthorIdsByEmails(emails: string[]): Promise<Map<string, number>> {
+/** Match submitter emails to author id and display name (for position-request queues). */
+export async function findAuthorsByEmails(
+  emails: string[]
+): Promise<Map<string, { id: number; name: string | null }>> {
   if (!emails?.length) return new Map()
   const normalized = [...new Set(emails.map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
   if (!normalized.length) return new Map()
   const rows = await Author.findAll({
-    attributes: ['id', 'email'],
+    attributes: ['id', 'email', 'name'],
     where: {
       [Op.or]: normalized.map((email) => ({ email: { [Op.iLike]: email } })),
     },
   })
-  const map = new Map<string, number>()
+  const map = new Map<string, { id: number; name: string | null }>()
   for (const row of rows || []) {
-    const r = row as { id?: number; email?: string }
+    const r = row as { id?: number; email?: string; name?: string | null }
     const e = r.email != null ? String(r.email).trim().toLowerCase() : null
-    if (e != null && r.id != null) map.set(e, r.id)
+    if (e != null && r.id != null) {
+      const rawName = r.name != null ? String(r.name).trim() : ''
+      map.set(e, { id: r.id, name: rawName !== '' ? rawName : null })
+    }
   }
   return map
 }

@@ -1,7 +1,7 @@
 <template>
   <div>
-    <h1 class="mt-0">Position requests</h1>
-    <p class="text-color-secondary mb-4">Entries from the position requests queue (reviewer/admin only).</p>
+    <h1 class="mt-0">Pending requests</h1>
+    <p class="text-color-secondary mb-4">Please review these requests.</p>
 
     <div v-if="loading" class="flex align-items-center justify-content-center p-4">
       <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
@@ -23,10 +23,10 @@
             <Column expander style="width: 3rem" />
             <Column field="id" header="ID" style="width: 5rem" />
             <Column field="type" header="Type" />
-            <Column field="email" header="Email">
+            <Column field="authorName" header="Author">
               <template #body="{ data }">
-                <router-link v-if="data.authorId" :to="'/authors/' + data.authorId">{{ data.email }}</router-link>
-                <span v-else>{{ data.email ?? '—' }}</span>
+                <router-link v-if="data.authorId" :to="'/authors/' + data.authorId">{{ displayAuthorLabel(data) }}</router-link>
+                <span v-else>{{ displayAuthorLabel(data) }}</span>
               </template>
             </Column>
             <Column field="comment" header="Comment">
@@ -138,11 +138,10 @@
         </template>
       </Dialog>
 
-      <Card>
+      <Card v-if="failed.length" >
         <template #title>Failed to decode</template>
         <template #content>
-          <p v-if="!failed.length" class="m-0 text-color-secondary">None.</p>
-          <DataTable v-else :value="failed" data-key="id" responsive-layout="scroll" class="p-datatable-sm">
+          <DataTable :value="failed" data-key="id" responsive-layout="scroll" class="p-datatable-sm">
             <Column field="id" header="ID" style="width: 5rem" />
             <Column field="sig" header="Signature" style="max-width: 12rem">
               <template #body="{ data }">
@@ -178,6 +177,8 @@ interface PendingItem {
   sig: string
   type: string
   email?: string
+  authorId?: number | null
+  authorName?: string | null
   comment?: string
   details?: unknown
 }
@@ -246,6 +247,14 @@ function truncate(str) {
   const s = str.trim()
   if (s.length <= 200) return s || '—'
   return s.slice(0, 200) + '…'
+}
+
+/** Prefer directory author name; fall back to submitter email when unknown or empty name. */
+function displayAuthorLabel(data: PendingItem) {
+  const name = data.authorName != null ? String(data.authorName).trim() : ''
+  if (name) return name
+  if (data.email != null && String(data.email).trim()) return String(data.email).trim()
+  return '—'
 }
 
 async function fetchCountries() {
