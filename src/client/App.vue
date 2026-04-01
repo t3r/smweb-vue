@@ -9,12 +9,14 @@
     <p class="auth-error-hint m-0 mt-2 text-muted">Check the server console for details. You can try logging in again.</p>
   </Message>
   <AppLayout />
+  <ClientUpdateDialog />
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AppLayout from './components/AppLayout.vue'
+import ClientUpdateDialog from './components/ClientUpdateDialog.vue'
 import { useAuthStore } from './stores/auth'
 import Message from 'primevue/message'
 

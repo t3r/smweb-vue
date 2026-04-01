@@ -15,6 +15,7 @@ import passport from './config/passport.js'
 import { sequelize } from './config/database.js'
 import { perIpLimiter, perSessionLimiter } from './middleware/rateLimit.js'
 import { CLIENT_ERROR_MESSAGE } from './utils/dbFallback.js'
+import { getClientBuildId } from './utils/clientBuildId.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -104,6 +105,12 @@ app.get('/api/health', async (_req, res) => {
       error: CLIENT_ERROR_MESSAGE,
     })
   }
+})
+
+/** Public: current server build id (git/VERSION/env) for SPA stale-client detection. */
+app.get('/api/client-build', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+  res.json({ buildId: getClientBuildId() })
 })
 
 app.use('/api', apiRoutes)
