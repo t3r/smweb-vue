@@ -1,13 +1,35 @@
 <template>
   <div
-    ref="containerRef"
-    class="object-map-container"
+    class="object-map-shell object-map-container"
     :class="{
       'object-map-compact': compact,
       'object-map-selectable': selectionMode && !selectionDraggable,
       'object-map-draggable-selection': selectionMode && selectionDraggable,
     }"
-  ></div>
+  >
+    <div ref="containerRef" class="object-map-maplibre-root"></div>
+    <div
+      v-if="pointerReadout"
+      class="map-pointer-readout"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="map-pointer-readout__row">
+        <span class="map-pointer-readout__value">{{ pointerReadout.tileIndex }}</span>
+      </div>
+
+      <div class="map-pointer-readout__row">
+        <span class="map-pointer-readout__value"
+          >{{ pointerReadout.decLat }}° | {{ pointerReadout.decLon }}°</span
+        >
+      </div>
+           <div class="map-pointer-readout__row">
+        <span class="map-pointer-readout__value"
+          >{{ pointerReadout.dmsLat }} | {{ pointerReadout.dmsLon }}</span
+        >
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -15,6 +37,7 @@ import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
+import { fgTileGridFeatureCollection, fgTileIndex } from '@/utils/fgSceneryTileGrid'
 
 /** Base map style using OpenStreetMap raster tiles. Glyphs required for symbol layers with text-field. */
 const OSM_STYLE: maplibregl.StyleSpecification = {
@@ -47,6 +70,26 @@ const MAP_FETCH_LIMIT = 2000
 /** Don't request objects when zoomed out beyond this (avoids globe-sized bbox). */
 const MIN_ZOOM_FOR_FETCH = 3
 
+/** FlightGear scenery tile grid (https://wiki.flightgear.org/Tile_Index_Scheme) */
+const FG_GRID_MIN_ZOOM = 6
+const FG_GRID_DEBOUNCE_MS = 150
+
+function fgGridMaxSpans(zoom: number): { lon: number; lat: number } {
+  if (zoom < 7) return { lon: 16, lat: 12 }
+  if (zoom < 8) return { lon: 24, lat: 16 }
+  if (zoom < 9) return { lon: 32, lat: 22 }
+  return { lon: 42, lat: 28 }
+}
+
+/** Cap GeoJSON line segments (MapLibre setData + tessellation is costly). */
+function fgGridMaxSegments(zoom: number): number {
+  if (zoom < 7) return 380
+  if (zoom < 8) return 520
+  if (zoom < 9) return 720
+  if (zoom < 11) return 1000
+  return 1300
+}
+
 const props = defineProps({
   /** List of objects with position: { lat, lon } (used when mapObjectsApiUrl is not set) */
   objects: { type: Array, default: () => [] },
@@ -73,9 +116,43 @@ const props = defineProps({
 const emit = defineEmits(['object-click', 'position-select'])
 
 const containerRef = ref(null)
+
+/** Bottom-left readout while cursor is over the map (mousemove). */
+const pointerReadout = ref(null)
+
+function wrapLongitude(lng: number): number {
+  let x = lng
+  while (x > 180) x -= 360
+  while (x < -180) x += 360
+  return x
+}
+
+function clampLatitude(lat: number): number {
+  return Math.max(-90, Math.min(90, lat))
+}
+
+/** Format one angle as degrees° minutes′ seconds″ hemisphere (zero-padded for stable width). */
+function formatDmsAngle(value: number, isLatitude: boolean): string {
+  const hemi = isLatitude ? (value >= 0 ? 'N' : 'S') : value >= 0 ? 'E' : 'W'
+  const v = Math.abs(value)
+  const deg = Math.floor(v + 1e-12)
+  const minFull = (v - deg) * 60
+  const min = Math.floor(minFull + 1e-12)
+  let sec = (minFull - min) * 60
+  if (sec >= 59.9995) sec = 59.99
+
+  const degW = String(deg).padStart(isLatitude ? 2 : 3, '0')
+  const minW = String(min).padStart(2, '0')
+  const secParts = sec.toFixed(2).split('.')
+  const secW = `${secParts[0].padStart(2, '0')}.${secParts[1]}`
+
+  return `${degW}° ${minW}′ ${secW}″ ${hemi}`
+}
 let map = null
 let clusterIndex = null
 let viewportFetchTimeout = null
+let fgTileGridDebounceTimer = null
+let fgGridIdleFallbackTimer = null
 /** Draggable selection marker (selectionMode + selectionDraggable) */
 let selectionMarker = null
 
@@ -435,7 +512,99 @@ onMounted(() => {
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right')
 
+  map.on('mousemove', (e) => {
+    const lat = clampLatitude(e.lngLat.lat)
+    const lng = wrapLongitude(e.lngLat.lng)
+    pointerReadout.value = {
+      tileIndex: fgTileIndex(lat, lng),
+      dmsLat: formatDmsAngle(lat, true),
+      dmsLon: formatDmsAngle(lng, false),
+      decLat: lat.toFixed(6),
+      decLon: lng.toFixed(6),
+    }
+  })
+  map.on('mouseout', () => {
+    pointerReadout.value = null
+  })
+
+  function updateFgTileGrid() {
+    if (!map?.isStyleLoaded()) return
+    const src = map.getSource('fg-scenery-tile-grid')
+    if (!src || src.type !== 'geojson') return
+    const z = map.getZoom()
+    if (z < FG_GRID_MIN_ZOOM) {
+      src.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+    const b = map.getBounds()
+    const west = b.getWest()
+    const south = b.getSouth()
+    const east = b.getEast()
+    const north = b.getNorth()
+    let lonSpan = east - west
+    if (lonSpan < 0) lonSpan += 360
+    const latSpan = north - south
+    const { lon: maxLon, lat: maxLat } = fgGridMaxSpans(z)
+    if (lonSpan > maxLon || latSpan > maxLat) {
+      src.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+    const bounds = { west, south, east, north }
+    const gridOpts = {
+      maxSegments: fgGridMaxSegments(z),
+      meridiansOnly: z < 7,
+    }
+    requestAnimationFrame(() => {
+      if (!map?.isStyleLoaded()) return
+      const s = map.getSource('fg-scenery-tile-grid')
+      if (!s || s.type !== 'geojson') return
+      s.setData(fgTileGridFeatureCollection(bounds, gridOpts))
+    })
+  }
+
+  function scheduleFgTileGridUpdate() {
+    if (fgTileGridDebounceTimer) clearTimeout(fgTileGridDebounceTimer)
+    fgTileGridDebounceTimer = setTimeout(() => {
+      fgTileGridDebounceTimer = null
+      updateFgTileGrid()
+    }, FG_GRID_DEBOUNCE_MS)
+  }
+
+  function ensureFgTileGridLayer() {
+    if (!map || map.getSource('fg-scenery-tile-grid')) return
+    map.addSource('fg-scenery-tile-grid', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    })
+    map.addLayer({
+      id: 'fg-scenery-tile-grid-lines',
+      type: 'line',
+      source: 'fg-scenery-tile-grid',
+      minzoom: FG_GRID_MIN_ZOOM,
+      layout: { 'line-join': 'miter', 'line-cap': 'butt' },
+      paint: {
+        'line-color': '#64748b',
+        'line-width': props.compact ? 0.65 : 0.9,
+        'line-opacity': 0.52,
+      },
+    })
+  }
+
   function addMarkerImagesThenLayers() {
+    ensureFgTileGridLayer()
+    /** Defer grid until map is idle so first paint + tiles are not blocked by GeoJSON work. */
+    if (fgGridIdleFallbackTimer) clearTimeout(fgGridIdleFallbackTimer)
+    fgGridIdleFallbackTimer = setTimeout(() => {
+      fgGridIdleFallbackTimer = null
+      scheduleFgTileGridUpdate()
+    }, 450)
+    map.once('idle', () => {
+      if (fgGridIdleFallbackTimer != null) {
+        clearTimeout(fgGridIdleFallbackTimer)
+        fgGridIdleFallbackTimer = null
+      }
+      scheduleFgTileGridUpdate()
+    })
     const staticData = createMarkerImageData(MARKER_STATIC_COLOR)
     const otherData = createMarkerImageData(MARKER_OTHER_COLOR)
     if (staticData && !map.hasImage('marker-static')) {
@@ -507,6 +676,7 @@ onMounted(() => {
   }
 
   map.on('moveend', () => {
+    scheduleFgTileGridUpdate()
     if (!useViewportFetch.value) return
     if (clusterIndex) updateClustersDisplay()
     scheduleViewportFetch()
@@ -570,6 +740,8 @@ watch(
 
 onBeforeUnmount(() => {
   if (viewportFetchTimeout) clearTimeout(viewportFetchTimeout)
+  if (fgTileGridDebounceTimer) clearTimeout(fgTileGridDebounceTimer)
+  if (fgGridIdleFallbackTimer) clearTimeout(fgGridIdleFallbackTimer)
   if (selectionMarker) {
     selectionMarker.remove()
     selectionMarker = null
@@ -583,16 +755,58 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.object-map-container {
+.object-map-shell {
+  position: relative;
   width: 100%;
   height: 400px;
   min-height: 200px;
   border-radius: 6px;
   overflow: hidden;
 }
-.object-map-compact {
+.object-map-maplibre-root {
+  width: 100%;
+  height: 100%;
+}
+.object-map-shell.object-map-compact {
   height: 240px;
   min-height: 160px;
+}
+.map-pointer-readout {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  pointer-events: none;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  padding: 8px 10px;
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.93);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.map-pointer-readout__row {
+  display: block;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+.map-pointer-readout__row:first-child {
+  margin-top: 0;
+}
+.map-pointer-readout__label {
+  color: #64748b;
+  font-weight: 600;
+}
+.map-pointer-readout__value {
+  display: block;
 }
 .object-map-selectable {
   cursor: crosshair;
