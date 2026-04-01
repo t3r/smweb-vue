@@ -4,6 +4,7 @@
     <Select
       id="theme-select"
       v-model="selectedKey"
+      size="small"
       :options="themeOptions"
       option-label="label"
       option-value="value"
@@ -197,28 +198,44 @@ onUnmounted(() => {
 .theme-picker {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  opacity: 0.72;
+  transition: opacity 0.2s ease;
+}
+.theme-picker:hover,
+.theme-picker:focus-within {
+  opacity: 1;
 }
 .theme-picker-label {
-  font-size: 0.875rem;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
+  border: 0;
 }
 .theme-picker-dropdown {
-  min-width: 11rem;
+  min-width: 7.25rem;
+  max-width: 9rem;
 }
 .color-scheme-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.3rem;
+  transform: scale(0.88);
+  transform-origin: center center;
 }
 .scheme-icon {
-  font-size: 1.125rem;
+  font-size: 0.95rem;
   color: var(--p-text-muted-color);
-  opacity: 0.45;
+  opacity: 0.35;
   transition: color 0.15s ease, opacity 0.15s ease;
 }
 .scheme-icon--active {
-  color: var(--p-primary-color);
-  opacity: 1;
+  color: var(--p-text-color);
+  opacity: 0.88;
 }
 </style>
