@@ -13,6 +13,16 @@ VERSION
 dist/
 build/
 
+# Lambda deployment bundle (CI / local before terraform apply)
+lambda/email-queue-worker/bundle.zip
+
+# Terraform (local state / vars; commit .terraform.lock.hcl when present)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.*.log
+terraform/email-queue-worker/terraform.tfvars
+
 # Uploads
 uploads/
 
