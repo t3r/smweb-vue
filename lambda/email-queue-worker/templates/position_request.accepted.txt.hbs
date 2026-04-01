@@ -8,6 +8,12 @@ Reference:  {{sig}}
 Your comment:
 {{comment}}
 {{/if}}
+{{#if hasDetailLinks}}
+View in the catalogue:
+{{#each detailLinks}}
+- {{label}}: {{href}}
+{{/each}}
+{{/if}}
 {{#if executeResult}}
 
 Result:

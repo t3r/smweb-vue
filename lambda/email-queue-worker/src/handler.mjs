@@ -53,6 +53,47 @@ function withTemplateUrls(data) {
   }
 }
 
+/**
+ * Catalogue links for accepted "add" requests (MODEL_ADD, OBJECTS_ADD).
+ * @param {Record<string, unknown>} data
+ * @returns {Record<string, unknown> & { detailLinks: { label: string; href: string }[]; hasDetailLinks: boolean }}
+ */
+function enrichAcceptedPayload(data) {
+  const base = getApiBaseUrl()
+  /** @type {{ label: string; href: string }[]} */
+  const detailLinks = []
+  if (base) {
+    const rt = typeof data.requestType === 'string' ? data.requestType : ''
+    const erRaw = data.executeResult
+    const er =
+      erRaw != null && typeof erRaw === 'object' && !Array.isArray(erRaw)
+        ? /** @type {Record<string, unknown>} */ (erRaw)
+        : {}
+    if (rt === 'MODEL_ADD') {
+      const mid = Number(er.modelId)
+      const oid = Number(er.objectId)
+      if (Number.isInteger(mid) && mid > 0) {
+        detailLinks.push({ label: `Model #${mid}`, href: `${base}/models/${mid}` })
+      }
+      if (Number.isInteger(oid) && oid > 0) {
+        detailLinks.push({ label: `Object #${oid}`, href: `${base}/objects/${oid}` })
+      }
+    } else if (rt === 'OBJECTS_ADD' && Array.isArray(er.objectIds)) {
+      for (const raw of er.objectIds) {
+        const id = Number(raw)
+        if (Number.isInteger(id) && id > 0) {
+          detailLinks.push({ label: `Object #${id}`, href: `${base}/objects/${id}` })
+        }
+      }
+    }
+  }
+  return {
+    ...data,
+    detailLinks,
+    hasDetailLinks: detailLinks.length > 0,
+  }
+}
+
 /** @type {Map<string, Handlebars.TemplateDelegate>} */
 const compiled = new Map()
 
@@ -66,7 +107,10 @@ function compileTemplate(name) {
 }
 
 function renderBody(eventType, data) {
-  const ctx = withTemplateUrls(data)
+  let ctx = withTemplateUrls(data)
+  if (eventType === 'position_request.accepted') {
+    ctx = enrichAcceptedPayload(ctx)
+  }
   const htmlTpl = compileTemplate(`${eventType}.html`)
   const textTpl = compileTemplate(`${eventType}.txt`)
   return {
@@ -77,7 +121,9 @@ function renderBody(eventType, data) {
 
 /** One email listing multiple queue items (same event type + recipient group). */
 function renderDigestBody(eventType, items) {
-  const ctx = withTemplateUrls({ items, count: items.length })
+  const rows =
+    eventType === 'position_request.accepted' ? items.map((row) => enrichAcceptedPayload(row)) : items
+  const ctx = withTemplateUrls({ items: rows, count: rows.length })
   const htmlTpl = compileTemplate(`${eventType}.digest.html`)
   const textTpl = compileTemplate(`${eventType}.digest.txt`)
   return {
@@ -374,4 +420,17 @@ export async function handler(_event) {
 
   console.log(JSON.stringify(results))
   return results
+}
+
+export {
+  getApiBaseUrl,
+  withTemplateUrls,
+  enrichAcceptedPayload,
+  renderBody,
+  renderDigestBody,
+  renderSubject,
+  partitionBatch,
+  buildItemRow,
+  isQueueMessage,
+  resolveRecipients,
 }

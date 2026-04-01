@@ -33,7 +33,7 @@ export interface PositionRequestAcceptedPayload {
   submitterEmail: string
   comment: string
   reviewerAuthorId?: number
-  /** Outcome of executeRequest (modelId, objectIds, etc.) for template hooks */
+  /** Outcome of executeRequest (modelId, objectId, objectIds, …); mailer builds catalogue links for MODEL_ADD / OBJECTS_ADD */
   executeResult?: unknown
 }
 

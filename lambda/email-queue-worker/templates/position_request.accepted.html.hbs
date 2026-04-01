@@ -10,6 +10,14 @@
     <tr><td style="padding: 0.25rem 1rem 0.25rem 0; vertical-align: top;"><strong>Your comment</strong></td><td>{{comment}}</td></tr>
     {{/if}}
   </table>
+  {{#if hasDetailLinks}}
+  <p style="margin-top: 1rem;"><strong>View in the catalogue</strong></p>
+  <ul style="margin: 0.25rem 0 0 1rem; padding: 0;">
+    {{#each detailLinks}}
+    <li style="margin: 0.35rem 0;"><a href="{{href}}" style="color: #1d4ed8;">{{label}}</a></li>
+    {{/each}}
+  </ul>
+  {{/if}}
   {{#if executeResult}}
   <p style="margin-top: 1rem;"><strong>Result</strong></p>
   <pre style="background: #f4f4f5; padding: 0.75rem; overflow: auto; font-size: 0.85rem;">{{json executeResult}}</pre>
