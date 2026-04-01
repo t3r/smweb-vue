@@ -113,6 +113,8 @@
                       :initial-center="locationMapCenter"
                       :initial-zoom="10"
                       compact
+                      :show-airport-icao-search="true"
+                      :airport-lookup-base-path="auth.apiUrl('/api/airports/by-icao')"
                       @position-select="onMapPositionSelect"
                     />
                     <span class="map-hint">Click on the map to place the marker</span>

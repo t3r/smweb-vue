@@ -8,47 +8,48 @@
     }"
   >
     <div ref="containerRef" class="object-map-maplibre-root"></div>
-    <div v-if="showAirportIcaoSearch" class="map-airport-search">
-      <form class="map-airport-search__form" @submit.prevent="goToAirportIcao">
-        <InputText
-          v-model="icaoInput"
-          type="text"
-          maxlength="4"
-          placeholder="ICAO"
-          size="small"
-          class="map-airport-search__input"
-          :disabled="airportSearchLoading"
-          autocomplete="off"
-          autocapitalize="characters"
-          spellcheck="false"
-          aria-label="Airport ICAO code"
-          @input="onIcaoFieldInput"
-        />
-
-      </form>
-      <div v-if="airportSearchError" class="map-airport-search__msg map-airport-search__msg--err" role="alert">
-        {{ airportSearchError }}
+    <!-- Stacking layer above MapLibre canvas (canvas can paint over following siblings without this). -->
+    <div class="map-html-overlays">
+      <div v-if="showAirportIcaoSearch" class="map-airport-search">
+        <form class="map-airport-search__form" @submit.prevent="goToAirportIcao">
+          <InputText
+            v-model="icaoInput"
+            type="text"
+            maxlength="4"
+            placeholder="ICAO"
+            size="small"
+            class="map-airport-search__input"
+            :disabled="airportSearchLoading"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            aria-label="Airport ICAO code"
+            @input="onIcaoFieldInput"
+          />
+        </form>
+        <div v-if="airportSearchError" class="map-airport-search__msg map-airport-search__msg--err" role="alert">
+          {{ airportSearchError }}
+        </div>
       </div>
-    </div>
-    <div
-      v-if="pointerReadout"
-      class="map-pointer-readout"
-      role="status"
-      aria-live="polite"
-    >
-      <div class="map-pointer-readout__row">
-        <span class="map-pointer-readout__value">{{ pointerReadout.tileIndex }}</span>
-      </div>
-
-      <div class="map-pointer-readout__row">
-        <span class="map-pointer-readout__value"
-          >{{ pointerReadout.decLat }}° | {{ pointerReadout.decLon }}°</span
-        >
-      </div>
-           <div class="map-pointer-readout__row">
-        <span class="map-pointer-readout__value"
-          >{{ pointerReadout.dmsLat }} | {{ pointerReadout.dmsLon }}</span
-        >
+      <div
+        v-if="pointerReadout"
+        class="map-pointer-readout"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="map-pointer-readout__row">
+          <span class="map-pointer-readout__value">{{ pointerReadout.tileIndex }}</span>
+        </div>
+        <div class="map-pointer-readout__row">
+          <span class="map-pointer-readout__value"
+            >{{ pointerReadout.decLat }}° | {{ pointerReadout.decLon }}°</span
+          >
+        </div>
+        <div class="map-pointer-readout__row">
+          <span class="map-pointer-readout__value"
+            >{{ pointerReadout.dmsLat }} | {{ pointerReadout.dmsLon }}</span
+          >
+        </div>
       </div>
     </div>
   </div>
@@ -56,6 +57,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
+import InputText from 'primevue/inputtext'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
@@ -925,6 +927,13 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
 }
+.map-html-overlays {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  isolation: isolate;
+}
 .object-map-shell.object-map-compact {
   height: 240px;
   min-height: 160px;
@@ -983,7 +992,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 6px;
   left: 6px;
-  z-index: 3;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 4px;

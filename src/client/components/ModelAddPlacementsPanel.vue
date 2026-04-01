@@ -18,6 +18,8 @@
         selection-mode
         :selection-position="selectionPosition"
         :selection-skip-when-feature-hit="true"
+        :show-airport-icao-search="true"
+        :airport-lookup-base-path="auth.apiUrl('/api/airports/by-icao')"
         @position-select="onMapClick"
       />
       <p class="text-secondary text-sm mt-2 mb-0">Crosshair: click the map to add a placement (only new positions are shown).</p>
