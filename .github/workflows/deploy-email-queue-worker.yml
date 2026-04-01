@@ -1,0 +1,102 @@
+# Deploys the scheduled email-queue Lambda via Terraform using GitHub OIDC → AWS assume role.
+#
+# One-time AWS setup (summary):
+# 1) IAM OIDC provider for token.actions.githubusercontent.com (if not already in the account).
+# 2) IAM role with trust policy allowing this repo (see terraform/email-queue-worker/github-actions-trust-policy.json.example).
+# 3) Attach a policy allowing Terraform to manage this stack + S3 state (see github-actions-deploy-policy.json.example).
+# 4) S3 bucket for Terraform state (optional DynamoDB table for locking).
+#
+# GitHub configuration:
+#   Secrets:  AWS_DEPLOY_ROLE_ARN (OIDC → first hop), TF_STATE_BUCKET, EMAIL_QUEUE_BEARER_TOKEN,
+#             TERRAFORM_AWS_ASSUME_ROLE_ARN (optional). When set, BOTH terraform init (S3 backend)
+#             and terraform apply (AWS provider) assume this role — OIDC role needs sts:AssumeRole on it.
+#             Optional: TF_STATE_DYNAMODB_TABLE (deprecated but still supported DynamoDB locking)
+#   Variables: AWS_REGION, API_BASE_URL, SES_FROM, NOTIFY_REVIEWER_EMAILS
+#             Optional: TF_STATE_KEY (default email-queue-worker/terraform.tfstate in the init step)
+#
+# Flow: configure-aws-credentials assumes AWS_DEPLOY_ROLE_ARN. If TERRAFORM_AWS_ASSUME_ROLE_ARN is set,
+# init uses S3 backend assume_role and apply uses provider assume_role for the same second hop.
+
+name: Deploy email queue worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lambda/email-queue-worker/**'
+      - 'terraform/email-queue-worker/**'
+      - '.github/workflows/deploy-email-queue-worker.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-email-queue-worker-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TF_IN_AUTOMATION: true
+  TF_ROOT: terraform/email-queue-worker
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Optional: use a GitHub Environment (e.g. production) to gate secrets and required reviewers.
+    # environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: lambda/email-queue-worker/package-lock.json
+
+      - name: Install Lambda dependencies and create bundle.zip
+        working-directory: lambda/email-queue-worker
+        run: npm ci && npm run zip
+
+      - name: Configure AWS credentials (OIDC assume role)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: github-actions-scenemodels-email-queue-worker
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.14.4
+          terraform_wrapper: false
+
+      - name: Terraform init (S3 backend)
+        env:
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
+        run: |
+          set -euo pipefail
+          KEY="${TF_STATE_KEY:-email-queue-worker/terraform.tfstate}"
+          ARGS=(
+            -backend-config="bucket=${TF_STATE_BUCKET}"
+            -backend-config="key=${KEY}"
+            -backend-config="region=${{ vars.AWS_REGION }}"
+            -backend-config="encrypt=true"
+            -backend-config="use_lockfile=true"
+          )
+          terraform -chdir="$TF_ROOT" init -input=false "${ARGS[@]}"
+
+      - name: Terraform apply
+        env:
+          TF_VAR_email_queue_bearer_token: ${{ secrets.EMAIL_QUEUE_BEARER_TOKEN }}
+        run: |
+          terraform -chdir="$TF_ROOT" apply -auto-approve -input=false \
+            -var="aws_region=${{ vars.AWS_REGION }}" \
+            -var="lambda_zip_path=../../lambda/email-queue-worker/bundle.zip" \
+            -var="api_base_url=${{ vars.API_BASE_URL }}" \
+            -var='ses_from=${{ vars.SES_FROM }}' \
+            -var="notify_reviewer_emails=${{ vars.NOTIFY_REVIEWER_EMAILS }}"
