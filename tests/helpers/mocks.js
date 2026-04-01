@@ -112,7 +112,7 @@ vi.mock('../../src/server/repositories/newsRepository.ts', () => ({
 }))
 
 vi.mock('../../src/server/services/statisticsService.ts', () => ({
-  getLatest: vi.fn().mockResolvedValue({ date: null, models: 0, objects: 0, authors: 0 }),
+  getLatest: vi.fn().mockResolvedValue({ date: null, models: 0, objects: 0, authors: 0, pendingRequests: 0 }),
 }))
 
 vi.mock('../../src/server/repositories/modelgroupRepository.ts', () => ({

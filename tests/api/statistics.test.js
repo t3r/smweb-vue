@@ -15,6 +15,7 @@ describe('GET /api/statistics', () => {
       models: expect.any(Number),
       objects: expect.any(Number),
       authors: expect.any(Number),
+      pendingRequests: expect.any(Number),
     })
   })
 })

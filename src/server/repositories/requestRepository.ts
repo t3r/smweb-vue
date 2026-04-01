@@ -195,6 +195,16 @@ export async function deleteRequest(sig: string): Promise<void> {
   )
 }
 
+/** Row count in fgs_position_requests (includes rows that fail decode in reviewer UI). */
+export async function countPendingRequests(): Promise<number> {
+  const rows = await sequelize.query(
+    `SELECT COUNT(*)::int AS c FROM fgs_position_requests`,
+    { type: QueryTypes.SELECT }
+  ) as { c: number }[]
+  const n = rows[0]?.c
+  return typeof n === 'number' && Number.isFinite(n) ? n : 0
+}
+
 /** Collect object and model IDs that have at least one pending request (for badge/indicator). */
 export async function getPendingEntityIds(): Promise<{ objectIds: number[]; modelIds: number[] }> {
   const rows = await sequelize.query(

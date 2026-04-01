@@ -2,12 +2,19 @@
   <div>
     <h1 class="mt-0">FlightGear Scenery Website</h1>
     <p class="text-color-secondary mb-4">Welcome to the FlightGear scenery website. Share tools and data for scenery: 3D models and object positions worldwide.</p>
-
+    <p>This is a test application with test data, no real FlithgGear data will be harmed.</p>
+    <Message severity="info" :closable="false" class="home-auth-notice mb-4">
+      Please note <strong>you have to be authenticated</strong> to place a model request. This might change in the future when this system is stable.
+    </Message>
     <Card class="mb-4">
-      <template #title>Stats</template>
+      <template #title>Statistics</template>
       <template #content>
         <p v-if="statsLoading" class="m-0">Loading…</p>
-        <p v-else class="m-0">{{ stats.models }} models · {{ stats.objects }} objects · {{ stats.authors }} authors</p>
+        <p v-else class="m-0">
+          {{ stats.models }} models · {{ stats.objects }} objects · {{ stats.authors }} authors ·
+          {{ stats.pendingRequests }}
+          pending request{{ stats.pendingRequests === 1 ? '' : 's' }}
+        </p>
       </template>
     </Card>
 
@@ -91,7 +98,7 @@ interface NewsItem {
   text: string
 }
 
-const stats = ref({ models: 0, objects: 0, authors: 0 })
+const stats = ref({ models: 0, objects: 0, authors: 0, pendingRequests: 0 })
 const statsLoading = ref(true)
 const recentObjects = ref([])
 const recentObjectsLoading = ref(true)
@@ -127,7 +134,12 @@ onMounted(async () => {
     const res = await fetch('/api/statistics')
     if (res.ok) {
       const data = await res.json()
-      stats.value = { models: data.models ?? 0, objects: data.objects ?? 0, authors: data.authors ?? 0 }
+      stats.value = {
+        models: data.models ?? 0,
+        objects: data.objects ?? 0,
+        authors: data.authors ?? 0,
+        pendingRequests: data.pendingRequests ?? 0,
+      }
     }
   } catch (_) { /* ignore */ }
   finally {
@@ -194,4 +206,13 @@ onMounted(async () => {
 .news-text { font-size: 0.9rem; color: var(--p-text-color); }
 .news-more-link { text-decoration: none; color: var(--p-primary-color); }
 .mt-2 { margin-top: 0.5rem; }
+/* Stronger emphasis than default Message body */
+.home-auth-notice :deep(.p-message-text) {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.home-auth-notice :deep(strong) {
+  font-weight: 700;
+  color: var(--p-message-info-color, var(--p-primary-color));
+}
 </style>
