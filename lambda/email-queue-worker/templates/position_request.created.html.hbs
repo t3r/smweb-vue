@@ -8,6 +8,11 @@
     <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Type</strong></td><td>{{requestType}}</td></tr>
     <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Signature</strong></td><td><code>{{sig}}</code></td></tr>
   </table>
-  <p style="margin-top: 1.5rem; font-size: 0.9rem; color: #444;">Open your reviewer tools to inspect and accept or reject this request.</p>
+  {{#if positionRequestsUrl}}
+  <p style="margin-top: 1.25rem; font-size: 0.9rem; color: #444;">
+    <a href="{{positionRequestsUrl}}" style="color: #1d4ed8;">Open the position requests page</a> to review the queue.
+  </p>
+  {{/if}}
+  <p style="margin-top: 1rem; font-size: 0.95rem; color: #374151;">Thank you for contributing to the FlightGear scenery community!</p>
 </body>
 </html>

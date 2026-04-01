@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
+  <h2>Position requests rejected ({{count}})</h2>
+  <p>The following FlightGear scenemodels position request(s) were <strong>not</strong> accepted.</p>
+  {{#each items}}
+  <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+    <p style="margin: 0 0 0.5rem 0;"><strong>#{{row}}</strong> — {{requestType}} — <code>{{sig}}</code></p>
+    {{#if reason}}
+    <p style="margin: 0.25rem 0;"><strong>Reason</strong><br/>{{reason}}</p>
+    {{/if}}
+    {{#if comment}}
+    <p style="margin: 0.25rem 0;"><strong>Your comment</strong><br/>{{comment}}</p>
+    {{/if}}
+  </div>
+  {{/each}}
+  <p style="margin-top: 1.5rem; font-size: 0.95rem; color: #374151;">Thank you for contributing to the FlightGear scenery community!</p>
+</body>
+</html>

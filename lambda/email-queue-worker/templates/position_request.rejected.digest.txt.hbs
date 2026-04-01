@@ -1,0 +1,19 @@
+Position requests rejected ({{count}})
+
+The following FlightGear scenemodels position request(s) were not accepted.
+
+{{#each items}}
+---
+#{{row}}
+Type:      {{requestType}}
+Reference: {{sig}}
+{{#if reason}}
+Reason:    {{reason}}
+{{/if}}
+{{#if comment}}
+Your comment:
+{{comment}}
+{{/if}}
+{{/each}}
+
+Thank you for contributing to the FlightGear scenery community!

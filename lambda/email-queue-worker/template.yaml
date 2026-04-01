@@ -5,7 +5,9 @@ Description: Periodic Lambda — FG scenemodels email queue → SES → delete o
 Parameters:
   ApiBaseUrl:
     Type: String
-    Description: Public base URL of the API (no trailing slash), e.g. https://api.example.com
+    Description: >
+      Public site base URL (no trailing slash), same origin as the SPA when applicable.
+      Used for API calls and reviewer email links to /position-requests. e.g. https://scenemodels.example.org
   EmailQueueBearerToken:
     Type: String
     NoEcho: true

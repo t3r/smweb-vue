@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
+  <h2>Position requests accepted ({{count}})</h2>
+  <p>Your FlightGear scenemodels position request(s) below have been <strong>accepted</strong> and applied.</p>
+  {{#each items}}
+  <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+    <p style="margin: 0 0 0.5rem 0;"><strong>#{{row}}</strong> — {{requestType}} — <code>{{sig}}</code></p>
+    {{#if comment}}
+    <p style="margin: 0.25rem 0;"><strong>Your comment</strong><br/>{{comment}}</p>
+    {{/if}}
+    {{#if executeResult}}
+    <p style="margin: 0.5rem 0 0 0;"><strong>Result</strong></p>
+    <pre style="background: #f4f4f5; padding: 0.75rem; overflow: auto; font-size: 0.85rem;">{{json executeResult}}</pre>
+    {{/if}}
+  </div>
+  {{/each}}
+  <p style="margin-top: 1.5rem; font-size: 0.95rem; color: #374151;">Thank you for contributing to the FlightGear scenery community!</p>
+</body>
+</html>

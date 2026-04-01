@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
+  <h2>New position requests ({{count}})</h2>
+  <p>The following {{count}} item(s) are waiting for review in the FlightGear scenemodels queue.</p>
+  <table style="border-collapse: collapse; width: 100%; max-width: 48rem; margin-top: 1rem;">
+    <thead>
+      <tr style="text-align: left; border-bottom: 2px solid #ccc;">
+        <th style="padding: 0.5rem 0.75rem 0.5rem 0;">#</th>
+        <th style="padding: 0.5rem 0.75rem;">Request ID</th>
+        <th style="padding: 0.5rem 0.75rem;">Type</th>
+        <th style="padding: 0.5rem 0;">Signature</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each items}}
+      <tr style="border-bottom: 1px solid #eee; vertical-align: top;">
+        <td style="padding: 0.5rem 0.75rem 0.5rem 0;">{{row}}</td>
+        <td style="padding: 0.5rem 0.75rem;">{{requestId}}</td>
+        <td style="padding: 0.5rem 0.75rem;">{{requestType}}</td>
+        <td style="padding: 0.5rem 0;"><code style="font-size: 0.85rem;">{{sig}}</code></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{#if positionRequestsUrl}}
+  <p style="margin-top: 1.25rem; font-size: 0.9rem; color: #444;">
+    <a href="{{positionRequestsUrl}}" style="color: #1d4ed8;">Open the position requests page</a> to review the queue.
+  </p>
+  {{/if}}
+  <p style="margin-top: 1rem; font-size: 0.95rem; color: #374151;">Thank you for contributing to the FlightGear scenery community!</p>
+</body>
+</html>

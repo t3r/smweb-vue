@@ -1,0 +1,21 @@
+Position requests accepted ({{count}})
+
+Your FlightGear scenemodels position request(s) below have been accepted and applied.
+
+{{#each items}}
+---
+#{{row}}
+Type:      {{requestType}}
+Reference: {{sig}}
+{{#if comment}}
+Your comment:
+{{comment}}
+{{/if}}
+{{#if executeResult}}
+
+Result:
+{{json executeResult}}
+{{/if}}
+{{/each}}
+
+Thank you for contributing to the FlightGear scenery community!

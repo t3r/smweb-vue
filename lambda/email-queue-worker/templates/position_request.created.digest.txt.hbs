@@ -1,10 +1,14 @@
-New position request
+New position requests ({{count}})
 
+The following {{count}} item(s) are waiting for review in the FlightGear scenemodels queue.
+
+{{#each items}}
+---
+Row {{row}}
 Request ID: {{requestId}}
 Type:       {{requestType}}
 Signature:  {{sig}}
-
-A new item is waiting for review in the FlightGear scenemodels queue.
+{{/each}}
 
 {{#if positionRequestsUrl}}
 Open the position requests page: {{positionRequestsUrl}}
