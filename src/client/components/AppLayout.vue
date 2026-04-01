@@ -77,6 +77,7 @@ const navItems = computed(() => {
     { label: 'Models', command: () => router.push('/models') },
     { label: 'Objects', command: () => router.push('/objects') },
     { label: 'Authors', command: () => router.push('/authors') },
+    { label: 'About', command: () => router.push('/about') },
   ]
   if (auth.isReviewer) {
     items.push({ label: 'Position requests', command: () => router.push('/position-requests') })
