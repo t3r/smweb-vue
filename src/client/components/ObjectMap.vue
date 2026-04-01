@@ -63,6 +63,19 @@ const OSM_STYLE: maplibregl.StyleSpecification = {
 }
 const DEFAULT_CENTER = [10, 53.5]
 const DEFAULT_ZOOM = 7
+
+/** Same rounding as MapView `onMapViewChange` (also used for self-sync fingerprint). */
+function roundViewForHistory(c: { lng: number; lat: number }, z: number) {
+  return {
+    lng: Number(c.lng.toFixed(5)),
+    lat: Number(c.lat.toFixed(5)),
+    zoom: Math.min(19, Math.max(0, Number(z.toFixed(2)))),
+  }
+}
+
+function historyKeyFromRounded(r: { lng: number; lat: number; zoom: number }) {
+  return `${r.lng},${r.lat},${r.zoom}`
+}
 const FIT_PADDING = 60
 const FIT_MAX_ZOOM = 14
 const VIEWPORT_FETCH_DEBOUNCE_MS = 300
@@ -103,6 +116,8 @@ const props = defineProps({
   initialCenter: { type: Array, default: () => [10, 53.5] },
   /** Initial zoom when not fitting to selection */
   initialZoom: { type: Number, default: 7 },
+  /** When true, emit view-change after pan/zoom (debounced) and jump when initialCenter/initialZoom change (e.g. browser history). */
+  syncViewToHistory: { type: Boolean, default: false },
   /** When true, clicking the map emits position-select with { lat, lon } and shows selectionPosition as a marker */
   selectionMode: { type: Boolean, default: false },
   /** If true (default), map clicks that hit object/cluster layers do not emit position-select (avoid adding on top of markers). */
@@ -113,7 +128,7 @@ const props = defineProps({
   selectionPosition: { type: Object, default: null },
 })
 
-const emit = defineEmits(['object-click', 'position-select'])
+const emit = defineEmits(['object-click', 'position-select', 'view-change'])
 
 const containerRef = ref(null)
 
@@ -153,6 +168,10 @@ let clusterIndex = null
 let viewportFetchTimeout = null
 let fgTileGridDebounceTimer = null
 let fgGridIdleFallbackTimer = null
+let viewHistoryEmitTimer = null
+let suppressViewHistoryEmit = false
+/** Fingerprint of last view we pushed to the URL (see roundViewForHistory); skips prop→jumpTo when route reflects our own emit). */
+let lastSelfSyncedHistoryKey: string | null = null
 /** Draggable selection marker (selectionMode + selectionDraggable) */
 let selectionMarker = null
 
@@ -675,8 +694,23 @@ onMounted(() => {
     })
   }
 
+  function scheduleViewHistoryEmit() {
+    if (!props.syncViewToHistory || !map || suppressViewHistoryEmit) return
+    if (viewHistoryEmitTimer) clearTimeout(viewHistoryEmitTimer)
+    viewHistoryEmitTimer = setTimeout(() => {
+      viewHistoryEmitTimer = null
+      if (!map || suppressViewHistoryEmit) return
+      const c = map.getCenter()
+      const z = map.getZoom()
+      const r = roundViewForHistory(c, z)
+      lastSelfSyncedHistoryKey = historyKeyFromRounded(r)
+      emit('view-change', { lng: c.lng, lat: c.lat, zoom: z })
+    }, 450)
+  }
+
   map.on('moveend', () => {
     scheduleFgTileGridUpdate()
+    if (props.syncViewToHistory) scheduleViewHistoryEmit()
     if (!useViewportFetch.value) return
     if (clusterIndex) updateClustersDisplay()
     scheduleViewportFetch()
@@ -738,10 +772,52 @@ watch(
   { deep: true }
 )
 
+watch(
+  () => {
+    if (!props.syncViewToHistory) return ''
+    const arr = props.initialCenter
+    if (!Array.isArray(arr) || arr.length < 2) return ''
+    const lng = Number(arr[0])
+    const lat = Number(arr[1])
+    const z = Number(props.initialZoom)
+    if (!Number.isFinite(lng) || !Number.isFinite(lat) || !Number.isFinite(z)) return ''
+    return historyKeyFromRounded(roundViewForHistory({ lng, lat }, z))
+  },
+  (key) => {
+    if (!map || !props.syncViewToHistory || !key) return
+    if (lastSelfSyncedHistoryKey !== null && key === lastSelfSyncedHistoryKey) {
+      return
+    }
+    const parts = key.split(',').map(Number)
+    const [lng, lat, zoom] = parts
+    const c = map.getCenter()
+    const z = map.getZoom()
+    const r = roundViewForHistory(c, z)
+    if (
+      Math.abs(r.lng - lng) < 1e-6 &&
+      Math.abs(r.lat - lat) < 1e-6 &&
+      Math.abs(r.zoom - zoom) < 1e-4
+    ) {
+      return
+    }
+    suppressViewHistoryEmit = true
+    lastSelfSyncedHistoryKey = historyKeyFromRounded(roundViewForHistory({ lng, lat }, zoom))
+    map.jumpTo({ center: [lng, lat], zoom })
+    requestAnimationFrame(() => {
+      suppressViewHistoryEmit = false
+    })
+  },
+  { flush: 'post' }
+)
+
 onBeforeUnmount(() => {
   if (viewportFetchTimeout) clearTimeout(viewportFetchTimeout)
   if (fgTileGridDebounceTimer) clearTimeout(fgTileGridDebounceTimer)
   if (fgGridIdleFallbackTimer) clearTimeout(fgGridIdleFallbackTimer)
+  if (viewHistoryEmitTimer) {
+    clearTimeout(viewHistoryEmitTimer)
+    viewHistoryEmitTimer = null
+  }
   if (selectionMarker) {
     selectionMarker.remove()
     selectionMarker = null
@@ -751,6 +827,7 @@ onBeforeUnmount(() => {
     map = null
   }
   clusterIndex = null
+  lastSelfSyncedHistoryKey = null
 })
 </script>
 
