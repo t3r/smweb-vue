@@ -32,15 +32,15 @@ function runModelUploadMulter(req: Request, res: Response, next: NextFunction): 
 }
 
 router.post('/objects/stg-preview', submissionsController.previewStgObjects)
-router.post('/objects', requireAuth, requireRole('tester'), submissionsController.submitObjects)
-router.post('/object/delete', requireAuth, requireRole('tester'), submissionsController.submitObjectDelete)
-router.post('/object/update', requireAuth, requireRole('tester'), submissionsController.submitObjectUpdate)
-router.post('/model/delete', requireAuth, requireRole('tester'), submissionsController.submitModelDelete)
-router.post('/models', requireAuth, requireRole('tester'), submissionsController.submitModel)
+router.post('/objects', requireAuth, requireRole('user'), submissionsController.submitObjects)
+router.post('/object/delete', requireAuth, requireRole('user'), submissionsController.submitObjectDelete)
+router.post('/object/update', requireAuth, requireRole('user'), submissionsController.submitObjectUpdate)
+router.post('/model/delete', requireAuth, requireRole('user'), submissionsController.submitModelDelete)
+router.post('/models', requireAuth, requireRole('user'), submissionsController.submitModel)
 router.post(
   '/models/upload',
   requireAuth,
-  requireRole('tester'),
+  requireRole('user'),
   runModelUploadMulter,
   submissionsController.submitModelUpload
 )
