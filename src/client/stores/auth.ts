@@ -42,12 +42,18 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function loginRedirectUrl(path: string): string {
+    const returnTo = `${window.location.pathname}${window.location.search}`
+    const qs = new URLSearchParams({ returnTo })
+    return `${apiUrl(path)}?${qs.toString()}`
+  }
+
   function loginWithGitHub(): void {
-    window.location.href = apiUrl('/api/auth/github')
+    window.location.href = loginRedirectUrl('/api/auth/github')
   }
 
   function loginWithGitLab(): void {
-    window.location.href = apiUrl('/api/auth/gitlab')
+    window.location.href = loginRedirectUrl('/api/auth/gitlab')
   }
 
   async function logout(): Promise<void> {

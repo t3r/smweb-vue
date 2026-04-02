@@ -1,8 +1,16 @@
+import crypto from 'node:crypto'
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import passport from '../config/passport.js'
 
 const router = Router()
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173'
+
+/** Must match session secret so HMAC is not guessable. */
+function oauthStateSecret(): string {
+  return process.env.SESSION_SECRET || 'change-me-in-production'
+}
+
+const OAUTH_STATE_TTL_MS = 20 * 60 * 1000
 
 function redirectToFrontend(req: Request, res: Response, path = ''): void {
   const url = `${FRONTEND_URL.replace(/\/$/, '')}${path ? `/${path.replace(/^\//, '')}` : ''}`
@@ -20,6 +28,50 @@ function sanitizeErrorMessage(err: unknown): string {
   if (!err || typeof err !== 'object') return ''
   const msg = (err as Error).message || (err as { toString?: () => string }).toString?.() || String(err)
   return msg.slice(0, 200).replace(/\s+/g, ' ').trim()
+}
+
+/** Allow only same-app relative paths (no protocol / open redirects). */
+function sanitizeReturnTo(raw: unknown): string | null {
+  if (raw == null) return null
+  const s = String(raw).trim()
+  if (!s.startsWith('/') || s.startsWith('//')) return null
+  if (s.includes('://') || s.includes('\0') || s.length > 2048) return null
+  if (/[\r\n]/.test(s)) return null
+  return s
+}
+
+/**
+ * Put post-login path in OAuth `state` (signed). Session cookies are often not sent on the
+ * top-level redirect from GitHub/GitLab back to the callback when SameSite=strict, so
+ * req.session.oauthReturnTo was lost while login still succeeded → user always hit home.
+ */
+function encodeOAuthReturnState(returnTo: string | null): string {
+  const payload = { rt: returnTo, t: Date.now() }
+  const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
+  const sig = crypto.createHmac('sha256', oauthStateSecret()).update(body).digest('base64url')
+  return `${body}.${sig}`
+}
+
+function decodeOAuthReturnState(state: unknown): string | null {
+  if (state == null || typeof state !== 'string' || !state.includes('.')) return null
+  const dot = state.lastIndexOf('.')
+  const body = state.slice(0, dot)
+  const sig = state.slice(dot + 1)
+  const expected = crypto.createHmac('sha256', oauthStateSecret()).update(body).digest('base64url')
+  try {
+    const sigBuf = Buffer.from(sig, 'utf8')
+    const expBuf = Buffer.from(expected, 'utf8')
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null
+  } catch {
+    return null
+  }
+  try {
+    const p = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as { rt?: unknown; t?: number }
+    if (typeof p.t !== 'number' || Date.now() - p.t > OAUTH_STATE_TTL_MS) return null
+    return sanitizeReturnTo(p.rt)
+  } catch {
+    return null
+  }
 }
 
 router.get('/me', (req: Request, res: Response) => {
@@ -48,7 +100,9 @@ function requireGitLabConfig(req: Request, res: Response, next: NextFunction): v
 }
 
 router.get('/github', requireGitHubConfig, (req, res, next) => {
-  passport.authenticate('github', { scope: ['user:email'] })(req, res, next)
+  const rt = sanitizeReturnTo(req.query.returnTo)
+  const state = encodeOAuthReturnState(rt)
+  passport.authenticate('github', { scope: ['user:email'], state })(req, res, next)
 })
 
 router.get(
@@ -74,14 +128,17 @@ router.get(
           redirectToFrontend(req, res, loginErrorParams('session_error', msg || 'Session could not be saved.'))
           return
         }
-        redirectToFrontend(req, res, '')
+        const returnPath = decodeOAuthReturnState(req.query.state) ?? ''
+        redirectToFrontend(req, res, returnPath)
       })
     })(req, res, next)
   }
 )
 
 router.get('/gitlab', requireGitLabConfig, (req, res, next) => {
-  passport.authenticate('gitlab', { scope: 'read_user' })(req, res, next)
+  const rt = sanitizeReturnTo(req.query.returnTo)
+  const state = encodeOAuthReturnState(rt)
+  passport.authenticate('gitlab', { scope: 'read_user', state })(req, res, next)
 })
 
 router.get(
@@ -107,7 +164,8 @@ router.get(
           redirectToFrontend(req, res, loginErrorParams('session_error', msg || 'Session could not be saved.'))
           return
         }
-        redirectToFrontend(req, res, '')
+        const returnPath = decodeOAuthReturnState(req.query.state) ?? ''
+        redirectToFrontend(req, res, returnPath)
       })
     })(req, res, next)
   }

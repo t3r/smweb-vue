@@ -69,7 +69,9 @@ const sessionConfig: Parameters<typeof session>[0] = {
     secure: isProduction && process.env.COOKIE_SECURE !== '0',
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    sameSite: isProduction ? 'strict' : 'lax',
+    // lax: OAuth callback is a top-level GET from the IdP; strict often drops the session cookie there,
+    // so pre-login session data was invisible on callback (return URL lived only in session before).
+    sameSite: 'lax',
   },
   ...(sessionStore ? { store: sessionStore } : {}),
 }
