@@ -2,9 +2,11 @@ import type { Request, Response } from 'express'
 import * as requestRepo from '../repositories/requestRepository.js'
 import * as modelRepo from '../repositories/modelRepository.js'
 import * as objectRepo from '../repositories/objectRepository.js'
+import * as modelService from '../services/modelService.js'
 import { logDbError, CLIENT_ERROR_MESSAGE } from '../utils/dbFallback.js'
 import { buildTarGz } from '../utils/buildTarGz.js'
 import { convertToThumbnailJpeg } from '../utils/thumbnailImage.js'
+import { extractTarToMap } from '../utils/tarList.js'
 import { isStgParseFailure, parseStgObjectLines, STG_MASS_IMPORT_MAX_LINES } from '../utils/stgObjectLines.js'
 import { enqueuePositionRequestCreated } from '../services/emailQueueEnqueue.js'
 import * as countryService from '../services/countryService.js'
@@ -12,10 +14,12 @@ import {
   assertFileSizeUnderLimit,
   assertFlatUploadFilename,
   assertModelPathAvailable,
+  assertModelPathForUpdate,
   normalizeTextFileBuffer,
   validateAc3dXmlPngNames,
   validateModelAddFormFields,
   validateModelFileBuffers,
+  validateModelUpdateFormFields,
   validateModelfileBase64Package,
   validateThumbnailBase64Input,
 } from '../utils/modelUploadValidation.js'
@@ -679,6 +683,313 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
     res.status(201).json({ id, sig, message: 'Queued for review' })
   } catch (err) {
     logDbError(err, 'POST /api/submissions/models/upload')
+    res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
+  }
+}
+
+/**
+ * Multipart model update: merge uploaded files into the existing tarball; omitted files are kept.
+ * Optional XML/PNG can be removed via `removeXml` / `removePngNames` (JSON array of tar entry names).
+ */
+export async function submitModelUpdateUpload(req: Request, res: Response): Promise<void> {
+  try {
+    const body = (req.body || {}) as Record<string, unknown>
+    const files = (req.files || {}) as Record<string, Express.Multer.File[]>
+    const modelId = body.modelId != null ? Number(body.modelId) : NaN
+    if (!Number.isInteger(modelId) || modelId < 1) {
+      res.status(400).json({ error: 'modelId is required and must be a positive integer' })
+      return
+    }
+
+    const modelRow = await modelService.getModelById(modelId)
+    if (!modelRow) {
+      res.status(404).json({ error: 'Model not found' })
+      return
+    }
+
+    const { modelIds: pendingModelIds } = await requestRepo.getPendingEntityIds()
+    if (pendingModelIds.includes(modelId)) {
+      res.status(409).json({ error: 'A pending request already exists for this model' })
+      return
+    }
+
+    const existingModelfileB64 = await modelRepo.findModelfileBase64ById(modelId)
+    if (!existingModelfileB64) {
+      res.status(400).json({ error: 'Existing model package could not be loaded' })
+      return
+    }
+
+    let existingPkg: Buffer
+    try {
+      existingPkg = Buffer.from(existingModelfileB64, 'base64')
+    } catch {
+      res.status(400).json({ error: 'Existing model package is invalid' })
+      return
+    }
+
+    const fileMap = extractTarToMap(existingPkg)
+    if (fileMap.size === 0) {
+      res.status(400).json({ error: 'Existing model package is empty or unreadable' })
+      return
+    }
+
+    const removeXml = body.removeXml === true || body.removeXml === 'true'
+    let removePngNames: string[] = []
+    try {
+      const raw = typeof body.removePngNames === 'string' ? body.removePngNames : '[]'
+      const arr = JSON.parse(raw) as unknown
+      if (Array.isArray(arr)) {
+        removePngNames = arr.filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+      }
+    } catch {
+      removePngNames = []
+    }
+
+    function deleteTarKeysMatching(predicate: (k: string) => boolean) {
+      for (const k of [...fileMap.keys()]) {
+        if (predicate(k)) fileMap.delete(k)
+      }
+    }
+
+    if (removeXml) {
+      deleteTarKeysMatching((k) => k.toLowerCase().endsWith('.xml'))
+    }
+
+    for (const p of removePngNames) {
+      const flat = assertFlatUploadFilename(p.trim())
+      if (flat) fileMap.delete(flat)
+    }
+
+    const thumbnailFiles = files.thumbnail
+    const ac3dFiles = files.ac3d
+    const xmlFiles = files.xml
+    const pngFiles = files.png
+
+    if (ac3dFiles?.length && ac3dFiles[0]?.buffer) {
+      const ac3d = ac3dFiles[0]!
+      let err = assertFileSizeUnderLimit(ac3d.size, 'AC3D file')
+      if (err) {
+        res.status(400).json({ error: err })
+        return
+      }
+      const acFlat = assertFlatUploadFilename(ac3d.originalname)
+      if (!acFlat) {
+        res.status(400).json({ error: 'Invalid AC3D file name.' })
+        return
+      }
+      deleteTarKeysMatching((k) => /\.ac$/i.test(k))
+      fileMap.set(acFlat, normalizeTextFileBuffer(ac3d.buffer))
+    }
+
+    if (xmlFiles?.length && xmlFiles[0]?.buffer) {
+      const xmlFile = xmlFiles[0]!
+      let err = assertFileSizeUnderLimit(xmlFile.size, 'XML file')
+      if (err) {
+        res.status(400).json({ error: err })
+        return
+      }
+      const xf = assertFlatUploadFilename(xmlFile.originalname)
+      if (!xf) {
+        res.status(400).json({ error: 'Invalid XML file name.' })
+        return
+      }
+      deleteTarKeysMatching((k) => k.toLowerCase().endsWith('.xml'))
+      fileMap.set(xf, normalizeTextFileBuffer(xmlFile.buffer))
+    }
+
+    if (pngFiles?.length) {
+      for (const f of pngFiles) {
+        if (!f?.buffer) continue
+        let err = assertFileSizeUnderLimit(f.size, `Texture "${f.originalname}"`)
+        if (err) {
+          res.status(400).json({ error: err })
+          return
+        }
+        const pf = assertFlatUploadFilename(f.originalname)
+        if (!pf) {
+          res.status(400).json({ error: `Invalid texture file name: "${f.originalname}".` })
+          return
+        }
+        fileMap.set(pf, f.buffer)
+      }
+    }
+
+    let acName: string | null = null
+    let acBuffer: Buffer | null = null
+    for (const [name, buf] of fileMap) {
+      if (/\.ac$/i.test(name)) {
+        if (acName != null) {
+          res.status(400).json({ error: 'Model package must contain exactly one .ac file.' })
+          return
+        }
+        acName = name
+        acBuffer = buf
+      }
+    }
+    if (!acName || !acBuffer) {
+      res.status(400).json({ error: 'Model package must contain an AC3D file (.ac).' })
+      return
+    }
+
+    let xmlNameInMap: string | null = null
+    let xmlBufferInMap: Buffer | null = null
+    for (const [name, buf] of fileMap) {
+      if (/\.xml$/i.test(name)) {
+        if (xmlNameInMap != null) {
+          res.status(400).json({ error: 'Model package must contain at most one .xml file.' })
+          return
+        }
+        xmlNameInMap = name
+        xmlBufferInMap = buf
+      }
+    }
+
+    const pngInMap = [...fileMap.entries()]
+      .filter(([n]) => /\.png$/i.test(n))
+      .sort(([a], [b]) => a.localeCompare(b))
+    const pngNamesInMap = pngInMap.map(([n]) => n)
+
+    const stemErr = validateAc3dXmlPngNames(acName, xmlNameInMap, pngNamesInMap)
+    if (stemErr) {
+      res.status(400).json({ error: stemErr })
+      return
+    }
+
+    const pathToUse = xmlNameInMap ?? acName
+    const pathErr = await assertModelPathForUpdate(modelId, pathToUse)
+    if (pathErr) {
+      res.status(400).json({ error: pathErr })
+      return
+    }
+
+    const acNorm = normalizeTextFileBuffer(acBuffer)
+    const xmlNorm = xmlBufferInMap ? normalizeTextFileBuffer(xmlBufferInMap) : null
+    const fileErr = await validateModelFileBuffers({
+      acBuffer: acNorm,
+      acFilename: acName,
+      xmlBuffer: xmlNorm,
+      xmlFilename: xmlNameInMap,
+      pngFiles: pngInMap.map(([n, b]) => ({ name: n, buffer: b })),
+    })
+    if (fileErr) {
+      res.status(400).json({ error: fileErr })
+      return
+    }
+
+    const tarEntries: { name: string; buffer: Buffer }[] = [{ name: acName, buffer: acNorm }]
+    if (xmlNameInMap && xmlNorm) {
+      tarEntries.push({ name: xmlNameInMap, buffer: xmlNorm })
+    }
+    for (const [n, b] of pngInMap) {
+      tarEntries.push({ name: n, buffer: b })
+    }
+
+    const modelfileGzip = await buildTarGz(tarEntries)
+    const modelfileBase64 = modelfileGzip.toString('base64')
+
+    let thumbnailBase64: string
+    if (thumbnailFiles?.length && thumbnailFiles[0]?.buffer) {
+      const thumb = thumbnailFiles[0]!
+      let err = assertFileSizeUnderLimit(thumb.size, 'Thumbnail')
+      if (err) {
+        res.status(400).json({ error: err })
+        return
+      }
+      if (!assertFlatUploadFilename(thumb.originalname)) {
+        res.status(400).json({ error: 'Invalid thumbnail file name.' })
+        return
+      }
+      try {
+        const thumbnailJpeg = await convertToThumbnailJpeg(thumb.buffer)
+        thumbnailBase64 = thumbnailJpeg.toString('base64')
+      } catch {
+        res.status(400).json({
+          error:
+            'Invalid thumbnail image; use a valid image file (e.g. JPEG, PNG). It will be converted to 320×240 JPEG.',
+        })
+        return
+      }
+    } else {
+      const existingThumb = await modelRepo.findThumbfileBase64StringById(modelId)
+      if (!existingThumb) {
+        res.status(400).json({ error: 'This model has no stored thumbnail; please upload a thumbnail image.' })
+        return
+      }
+      thumbnailBase64 = existingThumb
+    }
+
+    const name = body.name != null ? String(body.name).trim() : ''
+    if (!name) {
+      res.status(400).json({ error: 'name is required' })
+      return
+    }
+
+    if (body.gplAccepted !== true && body.gplAccepted !== 'true') {
+      res.status(400).json({ error: 'GPL acceptance required' })
+      return
+    }
+    const emailUpload = typeof body.email === 'string' ? body.email.trim() : ''
+    if (!emailUpload) {
+      res.status(400).json({ error: 'email is required' })
+      return
+    }
+
+    const rawAid = body.authorId != null ? Number(body.authorId) : null
+    let authorIdFinal: number
+    let authorNewForValidation: { name: string; email: string } | undefined
+    if (rawAid != null && Number.isInteger(rawAid) && rawAid >= 2 && rawAid <= 999) {
+      authorIdFinal = rawAid
+      authorNewForValidation = undefined
+    } else if (rawAid === 1 || rawAid == null) {
+      authorIdFinal = 1
+      authorNewForValidation = {
+        name: String(body.authorName ?? '').trim(),
+        email: String(body.authorEmail ?? '').trim(),
+      }
+    } else {
+      res.status(400).json({ error: 'Invalid author selection.' })
+      return
+    }
+
+    const formErr = await validateModelUpdateFormFields({
+      name,
+      description: String(body.description || '').trim(),
+      comment: String(body.comment || '').trim(),
+      email: emailUpload,
+      groupId: body.groupId != null ? Number(body.groupId) : Number(modelRow.groupId),
+      authorId: authorIdFinal,
+      authorNew: authorNewForValidation,
+    })
+    if (formErr) {
+      res.status(400).json({ error: formErr })
+      return
+    }
+
+    const content: Record<string, unknown> = {
+      modelid: modelId,
+      filename: pathToUse,
+      author: authorIdFinal,
+      name,
+      description: String(body.description || '').trim(),
+      thumbnail: thumbnailBase64,
+      modelfiles: modelfileBase64,
+      modelgroup: body.groupId != null ? Number(body.groupId) : Number(modelRow.groupId),
+    }
+
+    const { id, sig } = await requestRepo.saveRequest(
+      requestRepo.REQUEST_TYPES.MODEL_UPDATE,
+      content,
+      emailUpload,
+      String(body.comment || '').trim()
+    )
+    await enqueuePositionRequestCreated({
+      requestId: id,
+      sig,
+      requestType: requestRepo.REQUEST_TYPES.MODEL_UPDATE,
+    })
+    res.status(201).json({ id, sig, message: 'Model update queued for review' })
+  } catch (err) {
+    logDbError(err, 'POST /api/submissions/models/update-upload')
     res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
   }
 }

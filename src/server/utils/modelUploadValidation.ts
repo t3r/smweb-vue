@@ -308,6 +308,72 @@ export async function assertModelPathAvailable(moPath: string): Promise<string |
   return null
 }
 
+/** Allow keeping the same path for `modelId`, or taking a path not used by another model. */
+export async function assertModelPathForUpdate(modelId: number, moPath: string): Promise<string | null> {
+  const p = String(moPath || '').trim()
+  if (!p) return 'Model path (filename) is empty.'
+  const existing = await modelRepo.findIdByPathBasename(p)
+  if (existing != null && existing !== modelId) {
+    return `Filename "${p}" is already used by another model.`
+  }
+  return null
+}
+
+export async function validateModelUpdateFormFields(input: {
+  name: string
+  description: string
+  comment: string
+  email: string
+  groupId: number
+  authorId: number
+  authorNew?: { name: string; email: string } | null
+}): Promise<string | null> {
+  const { name, description, comment, email, groupId, authorId, authorNew } = input
+
+  if (!name.trim()) return 'Model name is required.'
+  if (!isCommentField(name, 100, false)) {
+    return 'Model name must be at most 100 characters and must not contain |.'
+  }
+
+  if (!isCommentField(description, 100, true)) {
+    return 'Description must be at most 100 characters and must not contain |.'
+  }
+
+  if (!isCommentField(comment, 100, true)) {
+    return 'Comment must be at most 100 characters and must not contain |.'
+  }
+
+  if (email.length > 50 || !RE_EMAIL.test(email)) {
+    return 'Please enter a valid email address (max 50 characters).'
+  }
+
+  if (!Number.isInteger(groupId) || groupId < 0 || !RE_MODEL_GROUP_ID.test(String(groupId))) {
+    return 'Please select a valid model family.'
+  }
+  if (!(await modelgroupRepo.existsById(groupId))) {
+    return 'The selected model family does not exist.'
+  }
+
+  const aidStr = String(authorId)
+  if (!RE_AUTHOR_ID.test(aidStr) || authorId < 1) {
+    return 'Please select a valid author.'
+  }
+
+  if (authorId === 1) {
+    if (!authorNew?.name?.trim() || !authorNew?.email?.trim()) {
+      return 'When author is "Other", name and email are required.'
+    }
+    if (!isCommentField(authorNew.name.trim(), 100, false)) {
+      return 'Author name must be at most 100 characters and must not contain |.'
+    }
+    if (authorNew.email.length > 50 || !RE_EMAIL.test(authorNew.email.trim())) {
+      return 'Please check the new author email address.'
+    }
+  }
+
+  return null
+}
+
 /** Validate a gzipped tarball (base64) from JSON MODEL_ADD submissions. */
 export async function validateThumbnailBase64Input(b64: string): Promise<string | null> {
   try {

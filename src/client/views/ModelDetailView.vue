@@ -12,7 +12,9 @@
       <Tag v-if="hasPendingRequest" severity="info" icon="pi pi-inbox" class="mb-3">Pending request</Tag>
 
       <div class="button-bar mb-3">
-        <Button label="Update" icon="pi pi-pencil" :disabled="hasPendingRequest" @click="showUpdatePanel = true" />
+        <router-link v-slot="{ navigate }" :to="`/models/${model.id}/edit`" custom>
+          <Button label="Update" icon="pi pi-pencil" :disabled="hasPendingRequest" @click="navigate" />
+        </router-link>
         <Button
           label="Delete"
           icon="pi pi-trash"
@@ -105,16 +107,6 @@
         </DataTable>
       </Panel>
 
-      <Panel v-if="showUpdatePanel" class="mt-4" header="Request model update">
-        <p class="text-secondary mb-3 model-update-hint m-0">
-          To request changes to this model (e.g. name, description, thumbnail, or files), please submit a new version via
-          <router-link to="/models/add" class="model-update-add-model-link">
-            <Button label="Add model" icon="pi pi-plus" />
-          </router-link>
-          <span>, or contact the maintainers.</span>
-        </p>
-        <Button label="Close" severity="secondary" @click="showUpdatePanel = false" />
-      </Panel>
     </template>
 
     <Dialog
@@ -183,8 +175,6 @@ const deleteDialogVisible = ref(false)
 const deleteConfirmId = ref('')
 const deleteSubmitting = ref(false)
 const requestEmail = ref('')
-const showUpdatePanel = ref(false)
-
 const modelObjects = ref<
   {
     id: number
@@ -423,19 +413,6 @@ watch(needsContactEmail, () => {
 
 <style scoped>
 .button-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.model-update-hint {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.5rem;
-  line-height: 1.5;
-}
-.model-update-add-model-link {
-  display: inline-flex;
-  text-decoration: none;
-  color: inherit;
-  vertical-align: middle;
-}
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
 .field label { font-weight: 500; font-size: 0.875rem; color: var(--p-text-color); }
 .required { color: var(--p-error-color, #e24c4c); }

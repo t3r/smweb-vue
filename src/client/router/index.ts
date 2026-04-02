@@ -6,6 +6,7 @@ const routes = [
   { path: '/about', name: 'About', component: () => import('@/views/AboutView.vue'), meta: { title: 'About' } },
   { path: '/models', name: 'Models', component: () => import('@/views/ModelsView.vue'), meta: { title: 'Models' } },
   { path: '/models/add', name: 'AddModel', component: () => import('@/views/AddModelView.vue'), meta: { title: 'Add model' } },
+  { path: '/models/:id/edit', name: 'EditModel', component: () => import('@/views/AddModelView.vue'), meta: { title: 'Update model' } },
   { path: '/models/:id', name: 'ModelDetail', component: () => import('@/views/ModelDetailView.vue'), meta: { title: 'Model' } },
   { path: '/map', name: 'Map', component: () => import('@/views/MapView.vue'), meta: { title: 'Map' } },
   { path: '/objects', name: 'Objects', component: () => import('@/views/ObjectsView.vue'), meta: { title: 'Objects' } },

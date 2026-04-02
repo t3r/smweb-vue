@@ -1,8 +1,16 @@
 <template>
   <div class="add-model-view">
-    <h1 class="mt-0">Add a model</h1>
+    <h1 class="mt-0">
+      <template v-if="isEditMode">Update model #{{ route.params.id }}</template>
+      <template v-else>Add a model</template>
+    </h1>
     <p class="text-color-secondary mt-0 intro-lead">
-      Submit a static or shared 3D model to the FlightGear scenery database. Fill in the sections below, then submit for review.
+      <template v-if="isEditMode">
+        Change name, family, author, or files. Leave a file control empty to keep the stored file. Use the checkboxes to drop optional XML or PNG entries from the package.
+      </template>
+      <template v-else>
+        Submit a static or shared 3D model to the FlightGear scenery database. Fill in the sections below, then submit for review.
+      </template>
     </p>
 
     <template v-if="!success">
@@ -55,17 +63,26 @@
                   <ul class="help-list-compact">
                     <li>Same base name for <code>.ac</code> / <code>.xml</code> / <code>.png</code> files.</li>
                     <li>PNG dimensions must be powers of 2. Thumbnail becomes 320×240 JPEG.</li>
+                    <li v-if="isEditMode">Empty file fields keep the current upload; new files replace matching entries in the package.</li>
                   </ul>
                   <div class="field-pair">
                     <div class="field">
-                      <label for="add-model-ac3d" class="field-label">AC3D <span class="required">*</span></label>
+                      <label for="add-model-ac3d" class="field-label">
+                        AC3D
+                        <span v-if="!isEditMode" class="required">*</span>
+                        <span v-else class="optional-file-hint">(optional)</span>
+                      </label>
                       <div class="file-cell">
                         <input id="add-model-ac3d" type="file" accept=".ac" @change="onAc3dChange" />
                         <span class="file-name">{{ ac3dFileName || 'No file chosen' }}</span>
                       </div>
                     </div>
                     <div class="field">
-                      <label for="add-model-thumb" class="field-label">Thumbnail <span class="required">*</span></label>
+                      <label for="add-model-thumb" class="field-label">
+                        Thumbnail
+                        <span v-if="!isEditMode" class="required">*</span>
+                        <span v-else class="optional-file-hint">(optional)</span>
+                      </label>
                       <div class="file-cell">
                         <input id="add-model-thumb" type="file" accept="image/*" @change="onThumbChange" />
                         <span class="file-name">{{ thumbFileName || 'No file chosen' }}</span>
@@ -84,6 +101,7 @@
                         />
                         <span class="file-name">{{ xmlFileName || 'None' }}</span>
                       </div>
+                      <p v-if="isEditMode" class="file-hint m-0">Upload a new XML to replace the current one, or use “remove” below.</p>
                     </div>
                     <div class="field">
                       <label for="add-model-png" class="field-label">PNG texture(s)</label>
@@ -91,13 +109,47 @@
                         <input id="add-model-png" type="file" accept=".png,image/png" multiple @change="onPngChange" />
                         <span class="file-name">{{ pngFileSummary }}</span>
                       </div>
+                      <p v-if="isEditMode" class="file-hint m-0">New PNGs are merged by filename; remove old names below if needed.</p>
                     </div>
                   </div>
+                </section>
+
+                <section
+                  v-if="isEditMode && packageFilesLoaded"
+                  class="form-section"
+                  aria-labelledby="add-model-existing-opt"
+                >
+                  <h2 id="add-model-existing-opt" class="form-section-title">Remove optional package files</h2>
+                  <p class="section-hint m-0">
+                    Applies to the stored tarball. Does not run until you submit the update request.
+                  </p>
+                  <div v-if="existingXmlName" class="checkbox-field">
+                    <Checkbox v-model="removeXmlFromPackage" input-id="remove-xml-pkg" binary />
+                    <label for="remove-xml-pkg">Remove <code>{{ existingXmlName }}</code> from the package</label>
+                  </div>
+                  <template v-if="existingPngEntries.length">
+                    <p class="field-label m-0 mb-2">PNG textures in package</p>
+                    <div v-for="e in existingPngEntries" :key="e.name" class="checkbox-field">
+                      <Checkbox
+                        :input-id="'rm-png-' + e.name"
+                        :model-value="removePngNames.includes(e.name)"
+                        binary
+                        @update:model-value="(v) => toggleRemovePng(e.name, v)"
+                      />
+                      <label :for="'rm-png-' + e.name"><code>{{ e.name }}</code> <span class="text-color-secondary">({{ e.size }} bytes)</span></label>
+                    </div>
+                  </template>
+                  <p
+                    v-if="!existingXmlName && existingPngEntries.length === 0"
+                    class="text-color-secondary m-0"
+                  >
+                    No optional XML or PNG files in this package.
+                  </p>
                 </section>
               </div>
 
               <!-- Right: map + position -->
-              <div class="add-form-col add-form-col--map">
+              <div v-if="!isEditMode" class="add-form-col add-form-col--map">
                 <section class="form-section" aria-labelledby="add-model-section-location">
                   <h2 id="add-model-section-location" class="form-section-title">Location</h2>
                   <p class="section-hint">Click the map or enter coordinates. Country is set from the database when you submit.</p>
@@ -241,7 +293,12 @@
             </section>
 
             <div class="submit-bar">
-              <Button label="Submit model" :loading="submitting" :disabled="!canSubmit" @click="submit" />
+              <Button
+                :label="isEditMode ? 'Submit update request' : 'Submit model'"
+                :loading="submitting"
+                :disabled="!canSubmit"
+                @click="submit"
+              />
             </div>
           </div>
         </template>
@@ -252,7 +309,10 @@
       <Card>
         <template #content>
           <p class="m-0 mb-3 text-color-secondary">Request #{{ successId ?? '?' }} has been submitted.</p>
-          <router-link to="/models">
+          <router-link v-if="isEditMode && editModelIdOk" :to="`/models/${editModelId}`" class="inline-link mr-2">
+            <Button label="Back to model" icon="pi pi-arrow-left" />
+          </router-link>
+          <router-link to="/models" class="inline-link">
             <Button label="Browse models" icon="pi pi-list" />
           </router-link>
         </template>
@@ -264,20 +324,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import ObjectMap from '@/components/ObjectMap.vue'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
 import { useAppToast } from '@/composables/useAppToast'
 import { useAuthStore } from '@/stores/auth'
 
+const route = useRoute()
 const auth = useAuthStore()
 const { toastSuccess } = useAppToast()
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
+
+const isEditMode = computed(() => route.name === 'EditModel')
+const editModelId = computed(() => {
+  if (!isEditMode.value) return NaN
+  const id = Number(route.params.id)
+  return Number.isInteger(id) && id > 0 ? id : NaN
+})
+const editModelIdOk = computed(() => Number.isFinite(editModelId.value) && editModelId.value > 0)
 const success = ref(false)
 const successId = ref<number | null>(null)
 const submitting = ref(false)
@@ -304,6 +375,20 @@ const pngFiles = ref<File[]>([])
 
 const modelGroups = ref<{ id: number; name: string | null; path: string | null }[]>([])
 const authors = ref<{ id: number; name: string | null }[]>([])
+
+const packageFilesLoaded = ref(false)
+const existingXmlName = ref<string | null>(null)
+const existingPngEntries = ref<{ name: string; size: number }[]>([])
+const removeXmlFromPackage = ref(false)
+const removePngNames = ref<string[]>([])
+const routeBootstrapDone = ref(false)
+
+function toggleRemovePng(name: string, v: unknown) {
+  const on = v === true
+  const arr = removePngNames.value
+  if (on && !arr.includes(name)) removePngNames.value = [...arr, name]
+  if (!on) removePngNames.value = arr.filter((n) => n !== name)
+}
 
 const ac3dFileName = computed(() => ac3dFile.value?.name ?? null)
 const thumbFileName = computed(() => thumbFile.value?.name ?? null)
@@ -349,25 +434,23 @@ function onMapPositionSelect(p: { lat: number; lon: number }) {
 }
 
 const canSubmit = computed(() => {
-  if (
-    (form.value.name?.trim().length ?? 0) === 0 ||
-    form.value.groupId == null ||
-    ac3dFile.value == null ||
-    thumbFile.value == null
-  ) {
+  if ((form.value.name?.trim().length ?? 0) === 0 || form.value.groupId == null) {
     return false
   }
-  const lon = Number(form.value.longitude)
-  const lat = Number(form.value.latitude)
-  if (
-    !Number.isFinite(lon) ||
-    lon < -180 ||
-    lon > 180 ||
-    !Number.isFinite(lat) ||
-    lat < -90 ||
-    lat > 90
-  ) {
-    return false
+  if (!isEditMode.value) {
+    if (ac3dFile.value == null || thumbFile.value == null) return false
+    const lon = Number(form.value.longitude)
+    const lat = Number(form.value.latitude)
+    if (
+      !Number.isFinite(lon) ||
+      lon < -180 ||
+      lon > 180 ||
+      !Number.isFinite(lat) ||
+      lat < -90 ||
+      lat > 90
+    ) {
+      return false
+    }
   }
   const hasContactEmail =
     auth.isAuthenticated && auth.user?.email ? true : (form.value.contactEmail?.trim().length ?? 0) > 0
@@ -430,7 +513,7 @@ async function loadOptions() {
     if (groupsRes.ok) {
       const d = await groupsRes.json()
       modelGroups.value = d.groups ?? []
-      if (form.value.groupId == null && modelGroups.value.length > 0) {
+      if (!isEditMode.value && form.value.groupId == null && modelGroups.value.length > 0) {
         const staticGroup = modelGroups.value.find((g: { name?: string }) =>
           g.name?.toLowerCase().includes('static')
         )
@@ -441,14 +524,59 @@ async function loadOptions() {
       const d = await authorsRes.json()
       authors.value = d.authors ?? []
     }
-    applyLoggedInUserToAuthorStep()
+    if (!isEditMode.value) applyLoggedInUserToAuthorStep()
   } catch (err) {
     console.error('Failed to load options', err)
   }
 }
 
+async function loadModelForEdit() {
+  const id = editModelId.value
+  if (!Number.isFinite(id)) {
+    showError('Invalid model id')
+    return
+  }
+  clearError()
+  packageFilesLoaded.value = false
+  existingXmlName.value = null
+  existingPngEntries.value = []
+  removeXmlFromPackage.value = false
+  removePngNames.value = []
+  try {
+    const res = await fetch(auth.apiUrl(`/api/models/${id}`), { credentials: 'include' })
+    if (!res.ok) {
+      showError(res.status === 404 ? 'Model not found' : 'Failed to load model')
+      return
+    }
+    const m = (await res.json()) as {
+      name?: string | null
+      description?: string | null
+      groupId?: number
+      author?: { id?: number } | null
+    }
+    form.value.name = (m.name && String(m.name).trim()) || ''
+    form.value.description = (m.description && String(m.description).trim()) || ''
+    if (m.groupId != null) form.value.groupId = String(m.groupId)
+    const aid = m.author?.id
+    if (aid != null && Number.isInteger(aid)) form.value.authorId = String(aid)
+
+    const fres = await fetch(auth.apiUrl(`/api/models/${id}/files`), { credentials: 'include' })
+    const fd = (await fres.json().catch(() => ({}))) as { files?: { name: string; size: number }[] }
+    const files = fd.files ?? []
+    const xml = files.find((f) => f.name.toLowerCase().endsWith('.xml'))
+    existingXmlName.value = xml?.name ?? null
+    existingPngEntries.value = files.filter((f) => f.name.toLowerCase().endsWith('.png'))
+    packageFilesLoaded.value = true
+
+    applyLoggedInUserToAuthorStep()
+  } catch (e) {
+    showError(e instanceof Error ? e.message : 'Failed to load model')
+  }
+}
+
 async function submit() {
-  if (!canSubmit.value || !ac3dFile.value || !thumbFile.value) return
+  if (!canSubmit.value) return
+  if (!isEditMode.value && (!ac3dFile.value || !thumbFile.value)) return
   clearError()
   submitting.value = true
   try {
@@ -456,10 +584,12 @@ async function submit() {
     fd.append('name', form.value.name.trim())
     fd.append('description', form.value.description.trim())
     fd.append('groupId', form.value.groupId ?? '1')
-    fd.append('longitude', form.value.longitude.trim())
-    fd.append('latitude', form.value.latitude.trim())
-    fd.append('offset', form.value.offset.trim() || '0')
-    fd.append('heading', form.value.heading.trim() || '0')
+    if (!isEditMode.value) {
+      fd.append('longitude', form.value.longitude.trim())
+      fd.append('latitude', form.value.latitude.trim())
+      fd.append('offset', form.value.offset.trim() || '0')
+      fd.append('heading', form.value.heading.trim() || '0')
+    }
     fd.append('comment', form.value.comment.trim())
     fd.append('gplAccepted', form.value.gplAccepted ? 'true' : 'false')
     fd.append('authorId', form.value.authorId ?? '1')
@@ -469,12 +599,27 @@ async function submit() {
     }
     const requestEmail = auth.user?.email ?? form.value.contactEmail.trim()
     fd.append('email', requestEmail)
-    fd.append('thumbnail', thumbFile.value)
-    fd.append('ac3d', ac3dFile.value)
-    if (xmlFile.value) fd.append('xml', xmlFile.value)
-    for (const f of pngFiles.value) fd.append('png', f)
 
-    const res = await fetch(auth.apiUrl('/api/submissions/models/upload'), {
+    const url = isEditMode.value
+      ? auth.apiUrl('/api/submissions/models/update-upload')
+      : auth.apiUrl('/api/submissions/models/upload')
+
+    if (isEditMode.value) {
+      fd.append('modelId', String(editModelId.value))
+      fd.append('removeXml', removeXmlFromPackage.value ? 'true' : 'false')
+      fd.append('removePngNames', JSON.stringify(removePngNames.value))
+      if (thumbFile.value) fd.append('thumbnail', thumbFile.value)
+      if (ac3dFile.value) fd.append('ac3d', ac3dFile.value)
+      if (xmlFile.value) fd.append('xml', xmlFile.value)
+      for (const f of pngFiles.value) fd.append('png', f)
+    } else {
+      fd.append('thumbnail', thumbFile.value!)
+      fd.append('ac3d', ac3dFile.value!)
+      if (xmlFile.value) fd.append('xml', xmlFile.value)
+      for (const f of pngFiles.value) fd.append('png', f)
+    }
+
+    const res = await fetch(url, {
       method: 'POST',
       credentials: 'include',
       body: fd,
@@ -487,7 +632,9 @@ async function submit() {
     successId.value = data.id ?? null
     success.value = true
     toastSuccess(
-      `Your model has been queued for review (request #${data.id ?? '?'}). A reviewer will process it shortly.`,
+      isEditMode.value
+        ? `Model update queued for review (request #${data.id ?? '?'}).`
+        : `Your model has been queued for review (request #${data.id ?? '?'}). A reviewer will process it shortly.`,
       'Submitted'
     )
   } catch (err) {
@@ -500,7 +647,22 @@ async function submit() {
 onMounted(async () => {
   await auth.fetchUser()
   await loadOptions()
+  if (isEditMode.value) await loadModelForEdit()
+  routeBootstrapDone.value = true
 })
+
+watch(
+  () => [route.name, route.params.id] as const,
+  async (cur, prev) => {
+    if (!routeBootstrapDone.value || prev == null) return
+    const [name, id] = cur
+    if (name !== 'EditModel' || id == null || id === '') return
+    if (prev[0] === name && String(prev[1]) === String(id)) return
+    success.value = false
+    await loadOptions()
+    await loadModelForEdit()
+  }
+)
 </script>
 
 <style scoped>
@@ -527,6 +689,36 @@ onMounted(async () => {
   .add-form-columns {
     grid-template-columns: 1fr minmax(18rem, 42%);
   }
+}
+.add-form-columns--single {
+  grid-template-columns: 1fr !important;
+}
+.optional-file-hint {
+  font-weight: 400;
+  color: var(--p-text-muted-color);
+  font-size: 0.85em;
+}
+.file-hint {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+}
+.checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.checkbox-field label {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.inline-link {
+  text-decoration: none;
+  display: inline-block;
+}
+.mr-2 {
+  margin-right: 0.5rem;
 }
 .add-form-col--main {
   min-width: 0;

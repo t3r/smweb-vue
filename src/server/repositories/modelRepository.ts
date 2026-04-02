@@ -146,6 +146,18 @@ export async function findThumbnailById(id: number): Promise<{ buffer: Buffer } 
   return buffer.length > 0 ? { buffer } : null
 }
 
+/** Raw base64 text in `mo_thumbfile` (for merging model updates without re-upload). */
+export async function findThumbfileBase64StringById(id: number): Promise<string | null> {
+  const row = await Model.findOne({
+    where: { id: Number(id), ...notDeletedWhere },
+    attributes: ['thumbfile'],
+    raw: true,
+  }) as { thumbfile?: string | null } | null
+  const t = row?.thumbfile
+  if (t == null || String(t).trim() === '') return null
+  return String(t)
+}
+
 export interface InsertModelData {
   path: string
   authorId: number

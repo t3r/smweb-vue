@@ -44,6 +44,13 @@ router.post(
   runModelUploadMulter,
   submissionsController.submitModelUpload
 )
+router.post(
+  '/models/update-upload',
+  requireAuth,
+  requireRole('user'),
+  runModelUploadMulter,
+  submissionsController.submitModelUpdateUpload
+)
 router.get('/pending', requireAuth, requireRole('reviewer'), validatorController.getPending)
 router.get('/pending/:sig', requireAuth, requireRole('reviewer'), validatorController.getBySig)
 router.post('/pending/:sig/accept', requireAuth, requireRole('reviewer'), validatorController.accept)
