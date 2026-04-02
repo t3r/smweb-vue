@@ -129,6 +129,8 @@ const offset = ref(0)
 const limit = 20
 const sortField = ref('lastUpdated')
 const sortOrder = ref(-1)
+/** From `?author=<id>` (e.g. links from author detail). API filters by authorId; separate from author name search. */
+const authorIdFilter = ref<number | null>(null)
 const filters = ref({
   name: { value: null as string | null, matchMode: 'contains' },
   group: { value: null as string | null, matchMode: 'equals' },
@@ -146,21 +148,45 @@ const typeFilterOptions = computed(() => {
   return [all, ...opts]
 })
 
+function parseAuthorIdParam(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const n = Number.parseInt(String(raw), 10)
+  if (!Number.isInteger(n) || n < 1) return null
+  return n
+}
+
 function syncFiltersFromRoute() {
   const q = route.query
   filters.value.name.value = q.search ? String(q.search) : null
   filters.value.group.value = q.group ? String(q.group) : null
   filters.value.author.value = q.authorSearch ? String(q.authorSearch) : null
+
+  const authorSearchTrim = filters.value.author.value?.trim() ?? ''
+  const idFromAuthor = parseAuthorIdParam(q.author)
+  // Name search in URL wins over author id (avoids conflicting API filters).
+  if (authorSearchTrim) {
+    authorIdFilter.value = null
+  } else {
+    authorIdFilter.value = idFromAuthor
+  }
 }
 
 function syncRouteFromFilters() {
+  const av = filters.value.author?.value
+  const authorSearchTrim = av && String(av).trim() ? String(av).trim() : ''
+  if (authorSearchTrim) {
+    authorIdFilter.value = null
+  }
+
   const query: Record<string, string> = {}
   const nameVal = filters.value.name?.value
   if (nameVal && String(nameVal).trim()) query.search = String(nameVal).trim()
   const g = filters.value.group?.value
   if (g != null && g !== '') query.group = String(g)
-  const av = filters.value.author?.value
-  if (av && String(av).trim()) query.authorSearch = String(av).trim()
+  if (authorSearchTrim) query.authorSearch = authorSearchTrim
+  if (authorIdFilter.value != null) {
+    query.author = String(authorIdFilter.value)
+  }
   router.replace({ path: '/models', query }).catch(() => {})
 }
 
@@ -231,7 +257,11 @@ async function fetchModels() {
     const groupVal = filters.value.group?.value
     if (groupVal != null && String(groupVal) !== '') params.set('group', String(groupVal))
     const authorVal = filters.value.author?.value
-    if (authorVal && String(authorVal).trim()) params.set('authorSearch', String(authorVal).trim())
+    const authorSearchTrim = authorVal && String(authorVal).trim() ? String(authorVal).trim() : ''
+    if (authorSearchTrim) params.set('authorSearch', authorSearchTrim)
+    if (authorIdFilter.value != null && !authorSearchTrim) {
+      params.set('author', String(authorIdFilter.value))
+    }
     if (sortField.value) params.set('sortField', sortField.value)
     if (sortOrder.value !== null && sortOrder.value !== undefined) params.set('sortOrder', String(sortOrder.value))
     const res = await fetch(`/api/models?${params}`)
