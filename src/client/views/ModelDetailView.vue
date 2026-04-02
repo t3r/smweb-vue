@@ -28,8 +28,6 @@
         Delete is only available when no object placements use this model. Remove those objects first.
       </p>
 
-      <Message v-if="deleteSuccessMessage" severity="success" class="mb-3" :closable="true" @close="deleteSuccessMessage = ''">{{ deleteSuccessMessage }}</Message>
-
       <ModelDetailsCard :model="modelForDetailsCard" />
 
       <ModelContentCard class="mt-3" :model-id="model.id" />
@@ -144,7 +142,11 @@
     </Dialog>
 
     <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
-    <ErrorDialog v-model:visible="objectsErrorDialogVisible" :message="objectsError ?? ''" />
+    <ErrorDialog
+      v-model:visible="objectsErrorDialogVisible"
+      :message="objectsError ?? ''"
+      @cleared="objectsError = null"
+    />
   </div>
 </template>
 
@@ -158,6 +160,7 @@ import InputText from 'primevue/inputtext'
 import Panel from 'primevue/panel'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
+import { useAppToast } from '@/composables/useAppToast'
 import ModelDetailsCard from '@/components/ModelDetailsCard.vue'
 import ModelContentCard from '@/components/ModelContentCard.vue'
 import ModelAddPlacementsPanel from '@/components/ModelAddPlacementsPanel.vue'
@@ -174,11 +177,11 @@ const model = ref<{
 } | null>(null)
 const loading = ref(true)
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
+const { toastSuccess } = useAppToast()
 
 const deleteDialogVisible = ref(false)
 const deleteConfirmId = ref('')
 const deleteSubmitting = ref(false)
-const deleteSuccessMessage = ref('')
 const requestEmail = ref('')
 const showUpdatePanel = ref(false)
 
@@ -282,7 +285,7 @@ async function confirmDelete() {
     const data = await res.json().catch(() => ({}))
     if (res.ok) {
       deleteDialogVisible.value = false
-      deleteSuccessMessage.value = (data.message as string) || 'Delete request queued for review.'
+      toastSuccess((data.message as string) || 'Delete request queued for review.', 'Submitted')
     } else {
       showError((data.error as string) || res.statusText)
     }

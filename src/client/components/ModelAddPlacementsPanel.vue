@@ -6,10 +6,6 @@
       <code>lon lat [heading] [offset_m]</code> (whitespace or comma separated).
     </p>
 
-    <Message v-if="successMessage" severity="success" class="mb-3" :closable="true" @close="successMessage = ''">
-      {{ successMessage }}
-    </Message>
-
     <div class="map-wrap mb-4">
       <ObjectMap
         :objects="mapDraftObjects"
@@ -101,8 +97,8 @@ import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import Panel from 'primevue/panel'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
 import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useAppToast } from '@/composables/useAppToast'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import DataTable from 'primevue/datatable'
@@ -134,6 +130,7 @@ const emit = defineEmits<{
 }>()
 
 const auth = useAuthStore()
+const { toastSuccess } = useAppToast()
 
 interface Draft {
   key: string
@@ -151,7 +148,6 @@ const comment = ref('')
 const email = ref('')
 const error = ref('')
 const errorDialogVisible = ref(false)
-const successMessage = ref('')
 const submitting = ref(false)
 
 function clearError() {
@@ -235,7 +231,6 @@ async function hydrateCountry(d: Draft) {
 
 function onMapClick(p: { lat: number; lon: number }) {
   clearError()
-  successMessage.value = ''
   selectionPosition.value = { lat: p.lat, lon: p.lon }
   const d: Draft = {
     key: newKey(),
@@ -314,7 +309,6 @@ function appendFromPaste() {
 
 async function submit() {
   clearError()
-  successMessage.value = ''
   if (!canSubmit.value) return
   submitting.value = true
   try {
@@ -347,7 +341,7 @@ async function submit() {
       showError(data.error || 'Submit failed')
       return
     }
-    successMessage.value = data.message || `Queued for review (request #${data.id ?? '?'})`
+    toastSuccess(data.message || `Queued for review (request #${data.id ?? '?'}).`, 'Submitted')
     clearDrafts()
     comment.value = ''
     emit('submitted')

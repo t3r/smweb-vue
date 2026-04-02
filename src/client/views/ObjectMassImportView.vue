@@ -13,11 +13,6 @@
       <li>Example: <code>OBJECT_SHARED Models/Airport/localizer.xml 121.337467 31.179872 2.47 267.03</code></li>
     </ul>
 
-    <Message v-if="success" severity="success" class="mb-3" :closable="false">
-      Your objects were queued for review (request #{{ successId }}).
-      <router-link to="/objects">Back to objects</router-link>
-    </Message>
-
     <template v-if="!success">
       <Card>
         <template #content>
@@ -72,18 +67,26 @@
             />
           </div>
 
-          <Message v-if="previewErrorLines.length > 0" severity="warn" class="mt-4" :closable="false">
-            <p class="mt-0 mb-2">Some lines need fixing:</p>
+          <div v-if="previewErrorLines.length > 0" class="preview-feedback preview-feedback--warn mt-4">
+            <p class="mt-0 mb-2 font-medium">Some lines need fixing:</p>
             <ul class="line-error-list">
               <li v-for="(e, idx) in previewErrorLines" :key="idx">
                 <strong>Line {{ e.line }}</strong>: {{ e.messages.join('; ') }}
                 <pre class="line-snippet">{{ e.text }}</pre>
               </li>
             </ul>
-          </Message>
-          <Message v-else-if="previewOkCount !== null && previewOkCount > 0" severity="success" class="mt-4" :closable="false">
-            All {{ previewOkCount }} line(s) look valid. You can submit for review.
-          </Message>
+          </div>
+        </template>
+      </Card>
+    </template>
+
+    <template v-else>
+      <Card>
+        <template #content>
+          <p class="m-0 mb-3 text-color-secondary">Request #{{ successId ?? '?' }} has been submitted.</p>
+          <router-link to="/objects">
+            <Button label="Browse objects" icon="pi pi-list" />
+          </router-link>
         </template>
       </Card>
     </template>
@@ -97,8 +100,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
+import { useAppToast } from '@/composables/useAppToast'
+import Button from 'primevue/button'
 
 const auth = useAuthStore()
+const { toastSuccess, toastWarn, toastInfo } = useAppToast()
 
 /** Guests and signed-in users without an email on the account must type one. */
 const needsGuestEmail = computed(
@@ -174,8 +180,13 @@ async function runPreview(): Promise<void> {
     }
     if (data.ok && typeof data.count === 'number') {
       previewOkCount.value = data.count
+      toastInfo(`All ${data.count} line(s) look valid. You can submit for review.`, 'Preview')
     } else if (data.lineErrors?.length) {
       previewErrorLines.value = data.lineErrors
+      toastWarn(
+        `${data.lineErrors.length} line(s) need fixing — see the list below.`,
+        'Preview'
+      )
     } else {
       showError('Unexpected preview response')
     }
@@ -223,6 +234,7 @@ async function submit(): Promise<void> {
     if (data.id != null) {
       success.value = true
       successId.value = data.id
+      toastSuccess(`Your objects were queued for review (request #${data.id}).`, 'Submitted')
     } else {
       showError('Unexpected response')
     }
@@ -278,5 +290,21 @@ async function submit(): Promise<void> {
   white-space: pre-wrap;
   word-break: break-all;
   opacity: 0.9;
+}
+.preview-feedback {
+  padding: 0.75rem 1rem;
+  border-radius: var(--p-border-radius-md);
+  border: 1px solid var(--p-content-border-color);
+}
+.preview-feedback--warn {
+  background: var(--p-message-warn-background, color-mix(in srgb, var(--p-amber-500) 12%, transparent));
+  border-color: var(--p-message-warn-border-color, var(--p-amber-500));
+  color: var(--p-message-warn-color, var(--p-text-color));
+}
+.text-color-secondary {
+  color: var(--p-text-muted-color);
+}
+.font-medium {
+  font-weight: 600;
 }
 </style>

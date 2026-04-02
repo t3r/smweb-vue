@@ -17,8 +17,6 @@
         <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="hasPendingRequest" @click="openDeleteDialog" />
       </div>
 
-      <Message v-if="deleteSuccessMessage" severity="success" class="mb-3" :closable="true" @close="deleteSuccessMessage = ''">{{ deleteSuccessMessage }}</Message>
-
       <ObjectDetailsCard :object="object" :countries="countries" />
 
       <Panel v-if="showUpdateForm" class="mt-4" header="Submit update request">
@@ -66,7 +64,6 @@
           <Button label="Submit" icon="pi pi-send" @click="submitUpdateRequest" :disabled="!canSubmitUpdate || hasPendingRequest" :loading="updateSubmitting" />
           <Button label="Cancel" severity="secondary" text @click="showUpdateForm = false" class="ml-2" />
         </div>
-        <Message v-if="updateMessage" severity="success" class="mt-2">{{ updateMessage }}</Message>
       </Panel>
     </template>
 
@@ -106,6 +103,7 @@ import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
+import { useAppToast } from '@/composables/useAppToast'
 import ObjectDetailsCard from '@/components/ObjectDetailsCard.vue'
 import ObjectMap from '@/components/ObjectMap.vue'
 
@@ -121,16 +119,15 @@ const object = ref<{
 } | null>(null)
 const loading = ref(true)
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
+const { toastSuccess } = useAppToast()
 const countries = ref<{ code: string; name?: string | null }[]>([])
 
 const deleteDialogVisible = ref(false)
 const deleteConfirmId = ref('')
 const deleteSubmitting = ref(false)
-const deleteSuccessMessage = ref('')
 const requestEmail = ref('')
 const showUpdateForm = ref(false)
 const updateSubmitting = ref(false)
-const updateMessage = ref('')
 
 const hasPendingRequest = computed(() => object.value?.hasPendingRequest === true)
 
@@ -250,7 +247,7 @@ async function confirmDelete() {
     if (res.ok) {
       deleteDialogVisible.value = false
       clearError()
-      deleteSuccessMessage.value = (data.message as string) || 'Delete request queued for review.'
+      toastSuccess((data.message as string) || 'Delete request queued for review.', 'Submitted')
     } else {
       showError((data.error as string) || res.statusText)
     }
@@ -263,7 +260,6 @@ async function confirmDelete() {
 
 async function submitUpdateRequest() {
   if (!object.value || !canSubmitUpdate.value) return
-  updateMessage.value = ''
   updateSubmitting.value = true
   try {
     const url = auth.apiUrl('/api/submissions/object/update')
@@ -289,7 +285,7 @@ async function submitUpdateRequest() {
     })
     const data = await res.json().catch(() => ({}))
     if (res.ok) {
-      updateMessage.value = (data.message as string) || 'Update request queued for review.'
+      toastSuccess((data.message as string) || 'Update request queued for review.', 'Submitted')
     } else {
       showError((data.error as string) || res.statusText)
     }

@@ -1,7 +1,6 @@
 <template>
   <div class="object-update-details">
     <p v-if="loading" class="m-0 text-color-secondary">Loading current object…</p>
-    <Message v-else-if="loadError" severity="error" class="m-0">{{ loadError }}</Message>
     <template v-else-if="currentObject">
       <p class="object-detail-link mb-2">
         <a :href="objectDetailUrl" target="_blank" rel="noopener noreferrer">View object in detail <i class="pi pi-external-link"></i></a>
@@ -67,13 +66,15 @@
         />
       </div>
     </template>
+    <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import Message from 'primevue/message'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useErrorDialog } from '@/composables/useErrorDialog'
 import ObjectMap from '@/components/ObjectMap.vue'
 
 export interface ObjectUpdateDetails {
@@ -234,24 +235,23 @@ async function fetchObject() {
   const id = props.details.objectId != null ? Number(props.details.objectId) : null
   if (id == null || !Number.isInteger(id) || id < 1) {
     loading.value = false
-    loadError.value = 'Invalid object id in request'
+    showError('Invalid object id in request')
     return
   }
   loading.value = true
-  loadError.value = null
   currentObject.value = null
   try {
     const url = auth.apiUrl(`/api/objects/${id}`)
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) {
-      if (res.status === 404) loadError.value = 'Object not found'
+      if (res.status === 404) showError('Object not found')
       else throw new Error(res.statusText)
       return
     }
     const data = await res.json()
     currentObject.value = data as FetchedObject
   } catch (err) {
-    loadError.value = (err as Error).message || 'Failed to load object'
+    showError((err as Error).message || 'Failed to load object')
   } finally {
     loading.value = false
   }

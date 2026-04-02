@@ -5,11 +5,6 @@
       Submit a static or shared 3D model to the FlightGear scenery database. Fill in the sections below, then submit for review.
     </p>
 
-    <Message v-if="success" severity="success" class="mb-3" :closable="false">
-      Your model has been queued for review (request #{{ successId }}). A reviewer will process it shortly.
-      <router-link to="/models">Back to models</router-link>
-    </Message>
-
     <template v-if="!success">
       <Card>
         <template #content>
@@ -253,6 +248,17 @@
       </Card>
     </template>
 
+    <template v-else>
+      <Card>
+        <template #content>
+          <p class="m-0 mb-3 text-color-secondary">Request #{{ successId ?? '?' }} has been submitted.</p>
+          <router-link to="/models">
+            <Button label="Browse models" icon="pi pi-list" />
+          </router-link>
+        </template>
+      </Card>
+    </template>
+
     <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
   </div>
 </template>
@@ -260,16 +266,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import Card from 'primevue/card'
-import Message from 'primevue/message'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 import ObjectMap from '@/components/ObjectMap.vue'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
+import { useAppToast } from '@/composables/useAppToast'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+const { toastSuccess } = useAppToast()
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 const success = ref(false)
 const successId = ref<number | null>(null)
@@ -479,6 +486,10 @@ async function submit() {
     }
     successId.value = data.id ?? null
     success.value = true
+    toastSuccess(
+      `Your model has been queued for review (request #${data.id ?? '?'}). A reviewer will process it shortly.`,
+      'Submitted'
+    )
   } catch (err) {
     showError(err instanceof Error ? err.message : 'Upload failed')
   } finally {

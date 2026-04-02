@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
 import { definePreset } from '@primeuix/themes'
 import Aura from '@primeuix/themes/aura'
 import Lara from '@primeuix/themes/lara'
@@ -17,7 +18,7 @@ import Column from 'primevue/column'
 import Select from 'primevue/select'
 import Breadcrumb from 'primevue/breadcrumb'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
+import Toast from 'primevue/toast'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import Skeleton from 'primevue/skeleton'
@@ -99,6 +100,7 @@ app.use(PrimeVue, {
     options: initialOptions,
   },
 })
+app.use(ToastService)
 app.provide('primevueThemePresets', PRESETS)
 app.provide('primevueThemeStorageKey', THEME_STORAGE_KEY)
 app.provide('primevueThemeOptionsKey', THEME_OPTIONS_STORAGE_KEY)
@@ -110,7 +112,7 @@ app.component('Column', Column)
 app.component('Select', Select)
 app.component('Breadcrumb', Breadcrumb)
 app.component('Button', Button)
-app.component('Message', Message)
+app.component('Toast', Toast)
 app.component('InputText', InputText)
 app.component('Textarea', Textarea)
 app.component('Skeleton', Skeleton)

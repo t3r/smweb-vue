@@ -164,6 +164,7 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
+import { useAppToast } from '@/composables/useAppToast'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import ModelDetailsCard from '@/components/ModelDetailsCard.vue'
@@ -190,6 +191,7 @@ const failed = ref([])
 const expandedRows = ref<Record<number, boolean>>({})
 const loading = ref(true)
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
+const { toastSuccess } = useAppToast()
 const countries = ref<{ code: string; name?: string | null }[]>([])
 
 const actionRequest = ref<{ sig: string } | null>(null)
@@ -324,6 +326,7 @@ async function confirmAccept() {
     if (res.ok) {
       acceptDialogVisible.value = false
       actionRequest.value = null
+      toastSuccess('The request was accepted and applied.', 'Accepted')
       await fetchRequests()
     } else {
       showError((data.error as string) || res.statusText)
@@ -351,6 +354,7 @@ async function confirmDecline() {
     if (res.ok) {
       declineDialogVisible.value = false
       onDeclineDialogHide()
+      toastSuccess('The request was declined.', 'Declined')
       await fetchRequests()
     } else {
       showError((data.error as string) || res.statusText)

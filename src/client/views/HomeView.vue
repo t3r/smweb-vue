@@ -3,9 +3,6 @@
     <h1 class="mt-0">FlightGear Scenery Website</h1>
     <p class="text-color-secondary mb-4">Welcome to the FlightGear scenery website. Share tools and data for scenery: 3D models and object positions worldwide.</p>
     <p>This is a test application with test data, no real FlithgGear data will be harmed.</p>
-    <Message severity="info" :closable="false" class="home-auth-notice mb-4">
-      Please note <strong>you have to be authenticated</strong> to place a model request. This might change in the future when this system is stable.
-    </Message>
     <Card class="mb-4">
       <template #title>Statistics</template>
       <template #content>
@@ -44,8 +41,8 @@
       <Card>
         <template #title>Recently updated objects</template>
         <template #content>
-          <Message v-if="recentObjectsError" severity="warn">{{ recentObjectsError }}</Message>
-          <p v-else-if="recentObjectsLoading" class="m-0">Loading…</p>
+          <p v-if="recentObjectsLoading" class="m-0">Loading…</p>
+          <p v-else-if="recentObjectsError" class="m-0 text-color-secondary">Could not load this list.</p>
           <p v-else-if="!recentObjects.length" class="m-0 text-color-secondary">No objects yet.</p>
           <ul v-else class="list-none p-0 m-0">
             <li v-for="obj in recentObjects" :key="obj.id" class="flex align-items-center gap-2 py-2 border-bottom-1 surface-border">
@@ -63,8 +60,8 @@
       <Card>
         <template #title>Recently updated models</template>
         <template #content>
-          <Message v-if="recentModelsError" severity="warn">{{ recentModelsError }}</Message>
-          <p v-else-if="recentModelsLoading" class="m-0">Loading…</p>
+          <p v-if="recentModelsLoading" class="m-0">Loading…</p>
+          <p v-else-if="recentModelsError" class="m-0 text-color-secondary">Could not load this list.</p>
           <p v-else-if="!recentModels.length" class="m-0 text-color-secondary">No models yet.</p>
           <ul v-else class="list-none p-0 m-0">
             <li v-for="model in recentModels" :key="model.id" class="flex align-items-center gap-2 py-2 border-bottom-1 surface-border">
@@ -84,11 +81,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import NewsTextWithLinks from '@/components/NewsTextWithLinks.vue'
+import { useAuthStore } from '@/stores/auth'
+import { useAppToast } from '@/composables/useAppToast'
 
 const HOME_NEWS_LIMIT = 5
+const auth = useAuthStore()
+const { toastInfo, toastWarn } = useAppToast()
+let authHintToasted = false
 
 interface NewsItem {
   id: number
@@ -128,6 +130,31 @@ function onThumbError(e: Event) {
   const t = e.target as HTMLImageElement
   if (t) t.style.display = 'none'
 }
+
+watch(
+  () => [auth.loaded, auth.isAuthenticated] as const,
+  ([loaded, isAuthed]) => {
+    if (!loaded || isAuthed || authHintToasted) return
+    authHintToasted = true
+    toastInfo(
+      'You need to be signed in to place a model request. This may change once the system is stable.',
+      'Signing in'
+    )
+  },
+  { immediate: true }
+)
+
+watch(newsError, (msg) => {
+  if (msg) toastWarn(msg, 'News')
+})
+
+watch(recentObjectsError, (msg) => {
+  if (msg) toastWarn(msg, 'Recent objects')
+})
+
+watch(recentModelsError, (msg) => {
+  if (msg) toastWarn(msg, 'Recent models')
+})
 
 onMounted(async () => {
   try {
@@ -206,13 +233,4 @@ onMounted(async () => {
 .news-text { font-size: 0.9rem; color: var(--p-text-color); }
 .news-more-link { text-decoration: none; color: var(--p-primary-color); }
 .mt-2 { margin-top: 0.5rem; }
-/* Stronger emphasis than default Message body */
-.home-auth-notice :deep(.p-message-text) {
-  font-size: 1rem;
-  line-height: 1.5;
-}
-.home-auth-notice :deep(strong) {
-  font-weight: 700;
-  color: var(--p-message-info-color, var(--p-primary-color));
-}
 </style>
