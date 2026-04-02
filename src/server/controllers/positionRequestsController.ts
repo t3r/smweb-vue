@@ -85,3 +85,45 @@ export async function getModelPreview(req: Request, res: Response): Promise<void
     res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
   }
 }
+
+/** Stored submission JPEG (320×240 after processing), not a render from the 3D package. */
+export async function getRequestModelThumbnail(req: Request, res: Response): Promise<void> {
+  try {
+    const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
+    if (!sig) {
+      res.status(400).json({ error: 'Missing sig' })
+      return
+    }
+    const request = await requestRepo.getRequestBySig(sig)
+    if (!request) {
+      res.status(404).json({ error: 'Request not found or already processed' })
+      return
+    }
+    if (request.type !== 'MODEL_ADD' || !request.content || typeof request.content !== 'object') {
+      res.status(400).json({ error: 'Not a MODEL_ADD request or no content' })
+      return
+    }
+    const content = request.content as Record<string, unknown>
+    const model = content.model as Record<string, unknown> | undefined
+    const thumbB64 = model?.thumbnail
+    if (!thumbB64 || typeof thumbB64 !== 'string') {
+      res.status(404).json({ error: 'No thumbnail in request' })
+      return
+    }
+    let buffer: Buffer
+    try {
+      buffer = Buffer.from(thumbB64, 'base64')
+    } catch {
+      res.status(400).json({ error: 'Invalid thumbnail encoding' })
+      return
+    }
+    if (!buffer.length) {
+      res.status(404).json({ error: 'No thumbnail in request' })
+      return
+    }
+    res.type('image/jpeg').send(buffer)
+  } catch (err) {
+    logDbError(err, 'GET /api/position-requests/:sig/thumbnail')
+    res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
+  }
+}

@@ -59,6 +59,7 @@
                   <ModelDetailsCard
                     :model="modelAddDetailsModel(data.details)"
                     :author-override="data.details.author || null"
+                    :request-sig="data.sig"
                     compact
                   />
                   <div v-if="data.details.object" class="details-object mt-2">
