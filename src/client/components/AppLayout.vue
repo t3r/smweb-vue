@@ -84,7 +84,7 @@ const navItems = computed(() => {
   }
   items.push({
       label: 'Old Site',
-      url: 'https://scenery.flightgear.org/',
+      url: 'https://legacy.scenery.flightgear.org/',
       target: '_blank',
       rel: 'noopener noreferrer',
   });

@@ -1,8 +1,26 @@
 <template>
   <div>
-    <h1 class="mt-0">FlightGear Scenery Website</h1>
-    <p class="text-color-secondary mb-4">Welcome to the FlightGear scenery website. Share tools and data for scenery: 3D models and object positions worldwide.</p>
-    <p>This is a test application with test data, no real FlithgGear data will be harmed.</p>
+    <h1 class="mt-0">FlightGear Scenery Repository</h1>
+    <p class="text-color-secondary mb-4">
+      Welcome to the New FlightGear Scenery Repository.
+    </p>
+    <p>
+    For decades, our PHP-based scenery platform has been a trusted cornerstone of the FlightGear community — reliably serving thousands of 3D object placements and worldwide position data to simmers across the globe. <br />
+Now we've rebuilt it from the ground up. The new platform is based on a modern Vue 3 + Node.js + PostgreSQL architecture, is fully open source, and available on <a href="https://github.com/t3r/smweb-vue">GitHub</a>.
+</p>
+<p>The codebase is backed by hundreds of automated tests and a continuous build and deployment pipeline, so contributions are easier, improvements and fixes reach you faster.<br />
+Dependencies are kept up to date automatically via Dependabot, keeping the platform secure and maintainable long into the future. <br />
+Contributing to the dataset has never been easier. A streamlined workflow lets community members submit and manage 3D scenery objects and their geographic positions with less friction, while a cleaner review process helps maintainers evaluate and approve contributions efficiently. <br />
+Role-based access control ensures that contributors, reviewers, and administrators each have clearly defined permissions — keeping collaboration both open and well-organized.
+</p>
+<p>Same trusted data. Modern tools. <br />
+Built by the community, for the community.</p>
+
+    <h2>Temporarily limited write access</h2>
+    <p>During an initial phase, this site restricts contributions to Admins only. <br />
+    We want to make sure everything works as expected before opening all service for public access. </br >
+    Feel free to look around. The old site is still available at <a href="https://legacy.scenery.flightgear.org">https://legacy.scenery.flightgear.org</a>.
+    </p>
     <Card class="mb-4">
       <template #title>Statistics</template>
       <template #content>
