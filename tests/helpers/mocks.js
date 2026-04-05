@@ -113,6 +113,12 @@ vi.mock('../../src/server/repositories/newsRepository.ts', () => ({
 
 vi.mock('../../src/server/services/statisticsService.ts', () => ({
   getLatest: vi.fn().mockResolvedValue({ date: null, models: 0, objects: 0, authors: 0, pendingRequests: 0 }),
+  getHistory: vi.fn().mockResolvedValue({
+    series: [
+      { date: '2020-01-01', models: 100, objects: 500, authors: 20 },
+      { date: '2021-06-01', models: 120, objects: 600, authors: 25 },
+    ],
+  }),
 }))
 
 vi.mock('../../src/server/repositories/modelgroupRepository.ts', () => ({

@@ -10,6 +10,13 @@ Base path: `/api`. Contract for tests and clients. Schema: `sql/scenemodels-sche
 
 ---
 
+## Statistics
+
+- **GET /api/statistics** — latest snapshot + pending queue count: `{ "date", "models", "objects", "authors", "pendingRequests" }` (`date` may be `null`).
+- **GET /api/statistics/history** — all rows from `fgs_statistics`, oldest first: `{ "series": [ { "date": "YYYY-MM-DD", "models", "objects", "authors" } ] }`.
+
+---
+
 ## Models
 
 - **GET /api/models**  

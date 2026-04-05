@@ -11,3 +11,13 @@ export async function getStatistics(req: Request, res: Response): Promise<void> 
     res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
   }
 }
+
+export async function getStatisticsHistory(_req: Request, res: Response): Promise<void> {
+  try {
+    const data = await statisticsService.getHistory()
+    res.json(data)
+  } catch (err) {
+    logDbError(err, 'GET /api/statistics/history')
+    res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
+  }
+}

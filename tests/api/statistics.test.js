@@ -19,3 +19,18 @@ describe('GET /api/statistics', () => {
     })
   })
 })
+
+describe('GET /api/statistics/history', () => {
+  it('returns 200 and series array of dated points', async () => {
+    const res = await request(app).get('/api/statistics/history')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.series)).toBe(true)
+    expect(res.body.series.length).toBeGreaterThan(0)
+    expect(res.body.series[0]).toMatchObject({
+      date: expect.any(String),
+      models: expect.any(Number),
+      objects: expect.any(Number),
+      authors: expect.any(Number),
+    })
+  })
+})
