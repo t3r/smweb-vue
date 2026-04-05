@@ -87,6 +87,8 @@ Base path: `/api`. Contract for tests and clients. Schema: `sql/scenemodels-sche
 
 Requests are stored in `fgs_position_requests` and processed by moderators via validator endpoints.
 
+Auth for POST endpoints below (except `/objects/stg-preview`) is controlled by **`POSITION_REQUEST_SUBMIT_ROLE`**: default signed-in **`user`** (or higher); set to **`none`** / **`anonymous`** / **`off`** to allow unauthenticated calls (still send **`email`** in the body where required).
+
 - **POST /api/submissions/objects**
   - Body: `{ "objects": [ { "modelId", "lat", "lon", "country", "elevationOffset"?, "heading"?, "description"? } ], "comment", "email"?: string }`
   - Response: `201` – `{ "id", "sig", "message": "Queued for review" }`; `400` on validation error

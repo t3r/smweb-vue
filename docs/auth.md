@@ -2,7 +2,7 @@
 
 - **OAuth:** GitHub and GitLab (authorization code). Callbacks: `{API_BASE}/api/auth/github/callback` and `.../gitlab/callback` (`API_BASE` defaults to `http://localhost:PORT`).
 - **Sessions:** PostgreSQL table `user_sessions` (`connect-pg-simple`, same DB as app). `SESSION_STORE=memory` forces in-memory store. In `NODE_ENV=test` without `TEST_USE_REAL_DB=1`, memory is used automatically.
-- **Roles:** `user` | `reviewer` | `tester` | `admin` in `fgs_user_roles`; new users get `user`. `tester` (or admin) is required for POST `/api/submissions/objects`, `/object/delete`, `/object/update`, `/model/delete`, `/models`, `/models/upload`. `au_id` = `fgs_authors.au_id` (linked via `fgs_extuserids` after login).
+- **Roles:** `user` | `reviewer` | `tester` | `admin` in `fgs_user_roles`; new users get `user`. POST `/api/submissions/objects`, `/object/delete`, `/object/update`, `/model/delete`, `/models`, `/models/upload`, `/models/update-upload` (anything that queues a position request) use **`POSITION_REQUEST_SUBMIT_ROLE`**: default `user` (signed-in user or higher), or `reviewer` / `tester` / `admin` for stricter gates, or **`none`** / **`anonymous`** / **`off`** to allow unauthenticated submit (callers must still send `email` in the JSON body where required). `au_id` = `fgs_authors.au_id` (linked via `fgs_extuserids` after login).
 
 ## Migration
 
@@ -29,11 +29,12 @@ ON CONFLICT (au_id) DO UPDATE SET role = EXCLUDED.role;
 ## Route guards
 
 ```js
-import { requireAuth, requireRole } from '../middleware/auth.js'
+import { requireAuth, requireRole, requirePositionRequestSubmitAuth } from '../middleware/auth.js'
 
 router.get('/protected', requireAuth, handler)
 router.get('/review', requireAuth, requireRole('reviewer'), handler)
 router.delete('/admin/x', requireAuth, requireRole('admin'), handler)
+router.post('/submissions/example', requirePositionRequestSubmitAuth, handler) // respects POSITION_REQUEST_SUBMIT_ROLE
 ```
 
 `req.user`: `{ id, name, email, role }` (`id` = author id).

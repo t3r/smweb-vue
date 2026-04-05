@@ -9,6 +9,7 @@ import { normalizeTextFileBuffer } from '../../src/server/utils/modelUploadValid
 vi.mock('../../src/server/middleware/auth.ts', () => ({
   requireAuth: (_req, _res, next) => next(),
   requireRole: () => (_req, _res, next) => next(),
+  requirePositionRequestSubmitAuth: (_req, _res, next) => next(),
 }))
 
 import { appPromise } from '../helpers/app.js'

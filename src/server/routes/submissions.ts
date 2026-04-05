@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from 'express'
 import multer, { MulterError } from 'multer'
 import * as submissionsController from '../controllers/submissionsController.js'
 import * as validatorController from '../controllers/validatorController.js'
-import { requireAuth, requireRole } from '../middleware/auth.js'
+import { requireAuth, requirePositionRequestSubmitAuth, requireRole } from '../middleware/auth.js'
 import { MODEL_UPLOAD_MAX_FILE_BYTES } from '../utils/modelUploadValidation.js'
 
 const router = express.Router()
@@ -32,22 +32,20 @@ function runModelUploadMulter(req: Request, res: Response, next: NextFunction): 
 }
 
 router.post('/objects/stg-preview', submissionsController.previewStgObjects)
-router.post('/objects', requireAuth, requireRole('user'), submissionsController.submitObjects)
-router.post('/object/delete', requireAuth, requireRole('user'), submissionsController.submitObjectDelete)
-router.post('/object/update', requireAuth, requireRole('user'), submissionsController.submitObjectUpdate)
-router.post('/model/delete', requireAuth, requireRole('user'), submissionsController.submitModelDelete)
-router.post('/models', requireAuth, requireRole('user'), submissionsController.submitModel)
+router.post('/objects', requirePositionRequestSubmitAuth, submissionsController.submitObjects)
+router.post('/object/delete', requirePositionRequestSubmitAuth, submissionsController.submitObjectDelete)
+router.post('/object/update', requirePositionRequestSubmitAuth, submissionsController.submitObjectUpdate)
+router.post('/model/delete', requirePositionRequestSubmitAuth, submissionsController.submitModelDelete)
+router.post('/models', requirePositionRequestSubmitAuth, submissionsController.submitModel)
 router.post(
   '/models/upload',
-  requireAuth,
-  requireRole('user'),
+  requirePositionRequestSubmitAuth,
   runModelUploadMulter,
   submissionsController.submitModelUpload
 )
 router.post(
   '/models/update-upload',
-  requireAuth,
-  requireRole('user'),
+  requirePositionRequestSubmitAuth,
   runModelUploadMulter,
   submissionsController.submitModelUpdateUpload
 )
