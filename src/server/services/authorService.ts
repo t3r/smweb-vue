@@ -8,6 +8,7 @@ interface AuthorRow {
   email?: string
   notes?: string
   modelsCount?: number
+  linkedIdentityProvider?: boolean
 }
 
 function normalizeAuthorDescription(notes: unknown): string | null {
@@ -26,6 +27,7 @@ function toApiAuthor(row: AuthorRow | Record<string, unknown> | null, includeEma
     name: r.name,
     description: normalizeAuthorDescription(r.notes),
     modelsCount: r.modelsCount,
+    linkedIdentityProvider: Boolean((r as { linkedIdentityProvider?: unknown }).linkedIdentityProvider),
   }
   if (includeEmail) out.email = r.email ?? null
   return out

@@ -9,14 +9,21 @@
         </template>
       </Breadcrumb>
 
-      <h1 class="mt-0">{{ author.name || `Author #${author.id}` }}</h1>
+      <h1 class="mt-0">
+        <span class="author-title-row inline-flex align-items-center flex-wrap gap-2">
+          <span>{{ author.name || `Author #${author.id}` }}</span>
+        </span>
+      </h1>
 
       <Panel header="Details" class="mb-3">
         <div class="detail-grid">
           <span class="detail-label">ID</span>
           <span>#{{ author.id }}</span>
           <span class="detail-label">Name</span>
-          <span>{{ author.name || '—' }}</span>
+          <span class="inline-flex align-items-center flex-wrap gap-1">
+            <span>{{ author.name || '—' }}</span>
+            <AuthorIdentityProviderBadge :linked="Boolean(author.linkedIdentityProvider)" />
+          </span>
           <template v-if="author.email != null">
             <span class="detail-label">Email</span>
             <span>{{ author.email || '—' }}</span>
@@ -83,6 +90,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ErrorDialog from '@/components/ErrorDialog.vue'
+import AuthorIdentityProviderBadge from '@/components/AuthorIdentityProviderBadge.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
 import { stripHtmlTags } from '@/utils/stripHtmlTags'
 
@@ -311,4 +319,9 @@ watch(() => route.params.id, () => void fetchAuthor())
   color: var(--p-text-muted-color, #64748b);
 }
 .mb-2 { margin-bottom: 0.5rem; }
+.inline-flex { display: inline-flex; }
+.align-items-center { align-items: center; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
 </style>

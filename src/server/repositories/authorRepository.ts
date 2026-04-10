@@ -5,6 +5,28 @@ import { sequelize } from '../config/database.js'
 
 const AUTHOR_SORT_FIELDS = ['id', 'name', 'description']
 
+/** True when the author has at least one row in fgs_extuserids (OAuth / external identity). */
+export async function hasLinkedIdentityProvider(authorId: number): Promise<boolean> {
+  const safeId = Number(authorId)
+  if (!Number.isInteger(safeId) || safeId < 1) return false
+  const rows = (await sequelize.query(
+    `SELECT EXISTS (SELECT 1 FROM fgs_extuserids WHERE eu_author_id = :authorId) AS "exists"`,
+    { replacements: { authorId: safeId }, type: QueryTypes.SELECT }
+  )) as { exists: boolean }[]
+  return Boolean(rows?.[0]?.exists)
+}
+
+/** Which of the given author ids appear in fgs_extuserids (batch for list pages). */
+export async function findAuthorIdsWithLinkedIdentity(ids: number[]): Promise<Set<number>> {
+  const unique = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))]
+  if (!unique.length) return new Set()
+  const rows = (await sequelize.query(
+    `SELECT DISTINCT eu_author_id AS id FROM fgs_extuserids WHERE eu_author_id IN (:ids)`,
+    { replacements: { ids: unique }, type: QueryTypes.SELECT }
+  )) as { id: number }[]
+  return new Set(rows.map((r) => Number(r.id)).filter((id) => Number.isInteger(id)))
+}
+
 function getAuthorOrder(sortField: string | undefined, sortOrder: number | undefined): [string, string][] {
   const dir = sortOrder === 1 ? 'ASC' : 'DESC'
   const nulls = dir === 'ASC' ? 'NULLS LAST' : 'NULLS FIRST'
@@ -43,14 +65,23 @@ export async function findAll(options: FindAllAuthorsOptions = {}): Promise<{ au
     offset: Number(offset),
     limit: Number(limit),
   })
-  return { authors: rows, total: count }
+  const linkedSet = await findAuthorIdsWithLinkedIdentity(rows.map((row) => (row as { id: number }).id))
+  const authors = rows.map((row) => {
+    const plain = row.get({ plain: true }) as { id: number; name?: string; email?: string; notes?: string }
+    return { ...plain, linkedIdentityProvider: linkedSet.has(Number(plain.id)) }
+  })
+  return { authors, total: count }
 }
 
 export async function findById(id: number): Promise<Record<string, unknown> | null> {
   const row = await Author.findByPk(id)
   if (!row) return null
-  const modelsCount = await Model.count({ where: { authorId: id } })
-  return { ...(row.toJSON() as Record<string, unknown>), modelsCount }
+  const safeId = Number(id)
+  const [modelsCount, linkedIdentityProvider] = await Promise.all([
+    Model.count({ where: { authorId: safeId } }),
+    hasLinkedIdentityProvider(safeId),
+  ])
+  return { ...(row.toJSON() as Record<string, unknown>), modelsCount, linkedIdentityProvider }
 }
 
 /** Get author id and name by email (for display). Returns null if not found. */

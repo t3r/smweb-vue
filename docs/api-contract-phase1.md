@@ -69,11 +69,11 @@ Base path: `/api`. Contract for tests and clients. Schema: `sql/scenemodels-sche
 - **GET /api/authors**
   - Response: `200`
   - Body: `{ "authors": Author[] }`
-  - `Author`: `{ "id", "name", "email"?, "modelsCount"?, "description"? }`
+  - `Author`: `{ "id", "name", "email"?, "modelsCount"?, "description"?, "linkedIdentityProvider"?: boolean }` — `linkedIdentityProvider` is true when the author has a row in `fgs_extuserids` (OAuth-linked account).
 
 - **GET /api/authors/:id**
   - Response: `200` – single author; `404` if not found
-  - Body: `{ "id", "name", "email", "description", "modelsCount", "joinDate"? }`
+  - Body: `{ "id", "name", "email", "description", "modelsCount", "linkedIdentityProvider"?, "joinDate"? }` — same `linkedIdentityProvider` semantics as list.
 
 ---
 

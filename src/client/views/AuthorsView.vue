@@ -39,7 +39,10 @@
           />
         </template>
         <template #body="{ data }">
-          <router-link :to="`/authors/${data.id}`">{{ data.name || 'Unnamed' }}</router-link>
+          <span class="author-name-cell inline-flex align-items-center flex-wrap gap-1">
+            <router-link :to="`/authors/${data.id}`">{{ data.name || 'Unnamed' }}</router-link>
+            <AuthorIdentityProviderBadge :linked="Boolean(data.linkedIdentityProvider)" />
+          </span>
         </template>
       </Column>
       <Column field="description" header="Description" sortable filter-field="description" :show-filter-menu="false">
@@ -73,6 +76,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ErrorDialog from '@/components/ErrorDialog.vue'
+import AuthorIdentityProviderBadge from '@/components/AuthorIdentityProviderBadge.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
 
 const route = useRoute()
@@ -185,4 +189,8 @@ onMounted(() => {
 .p-4 { padding: 1rem; }
 .text-center { text-align: center; }
 .text-color-secondary { color: var(--p-text-muted-color, #64748b); }
+.inline-flex { display: inline-flex; }
+.align-items-center { align-items: center; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-1 { gap: 0.25rem; }
 </style>
