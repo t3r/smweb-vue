@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.3",
-    "axios": "^1.10.0",
+    "axios": "^1.15.0",
     "compression": "^1.8.0",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
