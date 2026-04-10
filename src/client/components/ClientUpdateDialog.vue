@@ -25,8 +25,22 @@ import Button from 'primevue/button'
 
 const visible = ref(false)
 
-const loadedBuildId =
+function normalizeBuildId(raw: unknown): string {
+  if (raw == null) return ''
+  return String(raw).trim().toLowerCase()
+}
+
+const loadedBuildId = normalizeBuildId(
   typeof __FGS_GIT_SLUG__ !== 'undefined' && __FGS_GIT_SLUG__ ? __FGS_GIT_SLUG__ : ''
+)
+
+/** Same-origin path, respecting Vite `base` when the SPA is mounted under a subpath. */
+function clientBuildUrl(): string {
+  const base = import.meta.env.BASE_URL || '/'
+  const prefix = base === '/' ? '' : base.replace(/\/+$/, '')
+  const path = `${prefix}/api/client-build`.replace(/\/{2,}/g, '/')
+  return path.startsWith('/') ? path : `/${path}`
+}
 
 const POLL_MS = 5 * 60 * 1000
 
@@ -35,11 +49,13 @@ let intervalId: ReturnType<typeof setInterval> | null = null
 async function checkForNewerBuild(): Promise<void> {
   if (!import.meta.env.PROD || !loadedBuildId || visible.value) return
   try {
-    const res = await fetch('/api/client-build', { cache: 'no-store' })
+    const res = await fetch(clientBuildUrl(), { cache: 'no-store' })
     if (!res.ok) return
     const data = (await res.json()) as { buildId?: string }
-    const serverId = typeof data.buildId === 'string' ? data.buildId.trim() : ''
-    if (serverId && serverId !== loadedBuildId) {
+    const serverId = normalizeBuildId(data.buildId)
+    // "dev" is a non-specific fallback; comparing it to a real slug causes endless false positives.
+    if (!serverId || serverId === 'dev' || loadedBuildId === 'dev') return
+    if (serverId !== loadedBuildId) {
       visible.value = true
     }
   } catch {
