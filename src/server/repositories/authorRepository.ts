@@ -65,7 +65,7 @@ export async function findAll(options: FindAllAuthorsOptions = {}): Promise<{ au
     offset: Number(offset),
     limit: Number(limit),
   })
-  const linkedSet = await findAuthorIdsWithLinkedIdentity(rows.map((row) => (row as { id: number }).id))
+  const linkedSet = await findAuthorIdsWithLinkedIdentity(rows.map((row) => Number(row.get('id'))))
   const authors = rows.map((row) => {
     const plain = row.get({ plain: true }) as { id: number; name?: string; email?: string; notes?: string }
     return { ...plain, linkedIdentityProvider: linkedSet.has(Number(plain.id)) }
