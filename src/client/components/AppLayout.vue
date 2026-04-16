@@ -82,12 +82,6 @@ const navItems = computed(() => {
   if (auth.isReviewer) {
     items.push({ label: 'Pending requests', command: () => router.push('/position-requests') })
   }
-  items.push({
-      label: 'Old Site',
-      url: 'https://legacy.scenery.flightgear.org/',
-      target: '_blank',
-      rel: 'noopener noreferrer',
-  });
   return items
 })
 

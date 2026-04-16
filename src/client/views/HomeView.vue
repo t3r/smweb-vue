@@ -19,7 +19,7 @@ Built by the community, for the community.</p>
     <h2>Temporarily limited write access</h2>
     <p>During an initial phase, this site restricts contributions to users authenticate through gitlab or github. <br />
     We want to make sure everything works as expected before opening all service for public access. </br >
-    Feel free to look around. The old site is still available at <a href="https://legacy.scenery.flightgear.org">https://legacy.scenery.flightgear.org</a>.
+    Feel free to look around.
     </p>
     <Card class="mb-4">
       <template #title>Statistics</template>
