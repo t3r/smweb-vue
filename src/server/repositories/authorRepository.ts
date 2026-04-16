@@ -148,3 +148,61 @@ export async function updateNotesById(id: number, notes: string | null): Promise
   const [updated] = await Author.update({ notes }, { where: { id: safeId } })
   return updated > 0
 }
+
+export interface AuthorLeaderboardEntry {
+  id: number
+  name: string | null
+  count: number
+}
+
+/** Non-deleted models attributed to `mo_author`, ordered by count. */
+export async function findTopModelAuthorsAllTime(limit = 3): Promise<AuthorLeaderboardEntry[]> {
+  const safeLimit = Math.min(Math.max(Number(limit) || 3, 1), 50)
+  const rows = (await sequelize.query(
+    `
+    SELECT a.au_id AS id, a.au_name AS name, COUNT(m.mo_id)::int AS count
+    FROM fgs_models m
+    INNER JOIN fgs_authors a ON a.au_id = m.mo_author
+    WHERE m.mo_deleted IS NULL AND m.mo_author IS NOT NULL
+    GROUP BY a.au_id, a.au_name
+    ORDER BY count DESC, a.au_name ASC NULLS LAST, a.au_id ASC
+    LIMIT :limit
+    `,
+    { replacements: { limit: safeLimit }, type: QueryTypes.SELECT }
+  )) as { id: number; name: string | null; count: number }[]
+  return rows.map((r) => ({
+    id: Number(r.id),
+    name: r.name != null ? String(r.name) : null,
+    count: Number(r.count) || 0,
+  }))
+}
+
+/**
+ * Models with `mo_modified` in the last `days`, credited to `COALESCE(mo_modified_by, mo_author)`.
+ */
+export async function findTopModelAuthorsRecentDays(days: number, limit = 3): Promise<AuthorLeaderboardEntry[]> {
+  const safeDays = Math.min(Math.max(Number(days) || 180, 1), 3650)
+  const safeLimit = Math.min(Math.max(Number(limit) || 3, 1), 50)
+  const since = new Date()
+  since.setUTCDate(since.getUTCDate() - safeDays)
+  since.setUTCHours(0, 0, 0, 0)
+  const rows = (await sequelize.query(
+    `
+    SELECT a.au_id AS id, a.au_name AS name, COUNT(*)::int AS count
+    FROM fgs_models m
+    INNER JOIN fgs_authors a ON a.au_id = COALESCE(m.mo_modified_by, m.mo_author)
+    WHERE m.mo_deleted IS NULL
+      AND COALESCE(m.mo_modified_by, m.mo_author) IS NOT NULL
+      AND m.mo_modified >= :since
+    GROUP BY a.au_id, a.au_name
+    ORDER BY count DESC, a.au_name ASC NULLS LAST, a.au_id ASC
+    LIMIT :limit
+    `,
+    { replacements: { since, limit: safeLimit }, type: QueryTypes.SELECT }
+  )) as { id: number; name: string | null; count: number }[]
+  return rows.map((r) => ({
+    id: Number(r.id),
+    name: r.name != null ? String(r.name) : null,
+    count: Number(r.count) || 0,
+  }))
+}

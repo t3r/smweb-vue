@@ -34,3 +34,29 @@ describe('GET /api/statistics/history', () => {
     })
   })
 })
+
+describe('GET /api/statistics/author-contributions', () => {
+  it('returns 200 with recent and all-time top author entries', async () => {
+    const res = await request(app).get('/api/statistics/author-contributions')
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({
+      recentDays: 180,
+      recent: expect.any(Array),
+      allTime: expect.any(Array),
+    })
+    for (const row of res.body.recent) {
+      expect(row).toMatchObject({
+        id: expect.any(Number),
+        count: expect.any(Number),
+      })
+      expect(row.name === null || typeof row.name === 'string').toBe(true)
+    }
+    for (const row of res.body.allTime) {
+      expect(row).toMatchObject({
+        id: expect.any(Number),
+        count: expect.any(Number),
+      })
+      expect(row.name === null || typeof row.name === 'string').toBe(true)
+    }
+  })
+})

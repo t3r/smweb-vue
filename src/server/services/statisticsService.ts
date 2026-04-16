@@ -1,5 +1,6 @@
 import * as statisticsRepo from '../repositories/statisticsRepository.js'
 import * as requestRepo from '../repositories/requestRepository.js'
+import * as authorRepo from '../repositories/authorRepository.js'
 
 export interface StatisticsResult {
   date: unknown
@@ -61,4 +62,21 @@ export async function getHistory(): Promise<{ series: StatisticsHistoryPoint[] }
     })
   }
   return { series }
+}
+
+const LEADERBOARD_TOP_N = 3
+const LEADERBOARD_RECENT_DAYS = 180
+
+export interface AuthorContributionsLeaderboard {
+  recentDays: number
+  recent: authorRepo.AuthorLeaderboardEntry[]
+  allTime: authorRepo.AuthorLeaderboardEntry[]
+}
+
+export async function getAuthorContributionsLeaderboard(): Promise<AuthorContributionsLeaderboard> {
+  const [recent, allTime] = await Promise.all([
+    authorRepo.findTopModelAuthorsRecentDays(LEADERBOARD_RECENT_DAYS, LEADERBOARD_TOP_N),
+    authorRepo.findTopModelAuthorsAllTime(LEADERBOARD_TOP_N),
+  ])
+  return { recentDays: LEADERBOARD_RECENT_DAYS, recent, allTime }
 }

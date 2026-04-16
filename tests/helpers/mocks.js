@@ -119,6 +119,19 @@ vi.mock('../../src/server/services/statisticsService.ts', () => ({
       { date: '2021-06-01', models: 120, objects: 600, authors: 25 },
     ],
   }),
+  getAuthorContributionsLeaderboard: vi.fn().mockResolvedValue({
+    recentDays: 180,
+    recent: [
+      { id: 1, name: 'Ada', count: 5 },
+      { id: 2, name: 'Bob', count: 3 },
+      { id: 3, name: 'Cy', count: 1 },
+    ],
+    allTime: [
+      { id: 2, name: 'Bob', count: 42 },
+      { id: 1, name: 'Ada', count: 30 },
+      { id: 4, name: 'Dana', count: 12 },
+    ],
+  }),
 }))
 
 vi.mock('../../src/server/repositories/modelgroupRepository.ts', () => ({

@@ -21,3 +21,13 @@ export async function getStatisticsHistory(_req: Request, res: Response): Promis
     res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
   }
 }
+
+export async function getAuthorContributionsLeaderboard(_req: Request, res: Response): Promise<void> {
+  try {
+    const data = await statisticsService.getAuthorContributionsLeaderboard()
+    res.json(data)
+  } catch (err) {
+    logDbError(err, 'GET /api/statistics/author-contributions')
+    res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
+  }
+}

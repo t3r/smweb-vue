@@ -21,106 +21,168 @@ Built by the community, for the community.</p>
     We want to make sure everything works as expected before opening all service for public access. </br >
     Feel free to look around.
     </p>
-    <Card class="mb-4">
-      <template #title>Statistics</template>
-      <template #content>
-        <p v-if="statsLoading" class="m-0">Loading…</p>
-        <template v-else>
-          <p class="m-0 mb-3">
-            {{ stats.models }} models · {{ stats.objects }} objects · {{ stats.authors }} authors ·
-            {{ stats.pendingRequests }}
-            pending request{{ stats.pendingRequests === 1 ? '' : 's' }}
-          </p>
-          <p v-if="!statsSeries.length" class="m-0 text-color-secondary stats-chart-empty">
-            No rows in <code>fgs_statistics</code> yet — history chart will appear once snapshot data exists.
-          </p>
-          <div v-else-if="statsChart" class="stats-chart-block">
-            <p class="stats-chart-hint m-0 text-color-secondary">
-              Look, how our database has evolved over time!
+    <div class="stats-leaderboard-row mb-4">
+      <Card class="stats-leaderboard-row__stats">
+        <template #title>Statistics</template>
+        <template #content>
+          <p v-if="statsLoading" class="m-0">Loading…</p>
+          <template v-else>
+            <p class="m-0 mb-3">
+              {{ stats.models }} models · {{ stats.objects }} objects · {{ stats.authors }} authors ·
+              {{ stats.pendingRequests }}
+              pending request{{ stats.pendingRequests === 1 ? '' : 's' }}
             </p>
-            <div
-              class="stats-chart-stack"
-              role="group"
-              :aria-label="statsChartAriaLabel"
-            >
+            <p v-if="!statsSeries.length" class="m-0 text-color-secondary stats-chart-empty">
+              No rows in <code>fgs_statistics</code> yet — history chart will appear once snapshot data exists.
+            </p>
+            <div v-else-if="statsChart" class="stats-chart-block">
+              <p class="stats-chart-hint m-0 text-color-secondary">
+                Look, how our database has evolved over time!
+              </p>
               <div
-                v-for="panel in statsChart.panels"
-                :key="panel.key"
-                class="stats-chart-panel"
+                class="stats-chart-stack"
+                role="group"
+                :aria-label="statsChartAriaLabel"
               >
-                <svg
-                  class="stats-chart-svg stats-chart-panel-svg"
-                  :viewBox="`0 0 ${panel.w} ${panel.h}`"
-                  preserveAspectRatio="xMidYMid meet"
-                  aria-hidden="true"
-                  focusable="false"
+                <div
+                  v-for="panel in statsChart.panels"
+                  :key="panel.key"
+                  class="stats-chart-panel"
                 >
-                  <text
-                    :x="panel.padL"
-                    :y="panel.titleY"
-                    class="stats-chart-row-title"
-                    :class="`stats-chart-row-title--${panel.key}`"
+                  <svg
+                    class="stats-chart-svg stats-chart-panel-svg"
+                    :viewBox="`0 0 ${panel.w} ${panel.h}`"
+                    preserveAspectRatio="xMidYMid meet"
+                    aria-hidden="true"
+                    focusable="false"
                   >
-                    {{ panel.title }}
-                  </text>
-                  <line
-                    v-for="(g, i) in panel.gridLines"
-                    :key="`${panel.key}-g${i}`"
-                    class="stats-chart-grid"
-                    :x1="panel.padL"
-                    :y1="g.y"
-                    :x2="panel.w - panel.padR"
-                    :y2="g.y"
-                  />
-                  <text
-                    v-for="(g, i) in panel.yLabels"
-                    :key="`${panel.key}-yl${i}`"
-                    class="stats-chart-y-label"
-                    :class="`stats-chart-y-label--${panel.key}`"
-                    :x="panel.padL - 6"
-                    :y="g.y"
-                    text-anchor="end"
-                  >
-                    {{ g.label }}
-                  </text>
-                  <polyline
-                    fill="none"
-                    :class="`stats-chart-line stats-chart-line--${panel.key}`"
-                    :points="panel.points"
-                  />
-                  <template v-if="panel.xBaselineY != null && panel.xAxisLabels">
+                    <text
+                      :x="panel.padL"
+                      :y="panel.titleY"
+                      class="stats-chart-row-title"
+                      :class="`stats-chart-row-title--${panel.key}`"
+                    >
+                      {{ panel.title }}
+                    </text>
                     <line
-                      class="stats-chart-x-baseline"
+                      v-for="(g, i) in panel.gridLines"
+                      :key="`${panel.key}-g${i}`"
+                      class="stats-chart-grid"
                       :x1="panel.padL"
-                      :y1="panel.xBaselineY"
+                      :y1="g.y"
                       :x2="panel.w - panel.padR"
-                      :y2="panel.xBaselineY"
+                      :y2="g.y"
                     />
                     <text
-                      v-for="(xl, i) in panel.xAxisLabels"
-                      :key="'xlab-' + panel.key + '-' + i"
-                      class="stats-chart-x-label"
-                      :class="{ 'stats-chart-x-label--muted': xl.muted }"
-                      :x="xl.x"
-                      :y="xl.y"
-                      :text-anchor="xl.anchor"
-                      dominant-baseline="alphabetic"
+                      v-for="(g, i) in panel.yLabels"
+                      :key="`${panel.key}-yl${i}`"
+                      class="stats-chart-y-label"
+                      :class="`stats-chart-y-label--${panel.key}`"
+                      :x="panel.padL - 6"
+                      :y="g.y"
+                      text-anchor="end"
                     >
-                      {{ xl.label }}
+                      {{ g.label }}
                     </text>
-                  </template>
-                </svg>
+                    <polyline
+                      fill="none"
+                      :class="`stats-chart-line stats-chart-line--${panel.key}`"
+                      :points="panel.points"
+                    />
+                    <template v-if="panel.xBaselineY != null && panel.xAxisLabels">
+                      <line
+                        class="stats-chart-x-baseline"
+                        :x1="panel.padL"
+                        :y1="panel.xBaselineY"
+                        :x2="panel.w - panel.padR"
+                        :y2="panel.xBaselineY"
+                      />
+                      <text
+                        v-for="(xl, i) in panel.xAxisLabels"
+                        :key="'xlab-' + panel.key + '-' + i"
+                        class="stats-chart-x-label"
+                        :class="{ 'stats-chart-x-label--muted': xl.muted }"
+                        :x="xl.x"
+                        :y="xl.y"
+                        :text-anchor="xl.anchor"
+                        dominant-baseline="alphabetic"
+                      >
+                        {{ xl.label }}
+                      </text>
+                    </template>
+                  </svg>
+                </div>
+              </div>
+              <div class="stats-chart-legend">
+                <span class="stats-chart-legend-item"><span class="stats-chart-swatch stats-chart-swatch--models" aria-hidden="true" /> Models</span>
+                <span class="stats-chart-legend-item"><span class="stats-chart-swatch stats-chart-swatch--objects" aria-hidden="true" /> Objects</span>
+                <span class="stats-chart-legend-item"><span class="stats-chart-swatch stats-chart-swatch--authors" aria-hidden="true" /> Authors</span>
               </div>
             </div>
-            <div class="stats-chart-legend">
-              <span class="stats-chart-legend-item"><span class="stats-chart-swatch stats-chart-swatch--models" aria-hidden="true" /> Models</span>
-              <span class="stats-chart-legend-item"><span class="stats-chart-swatch stats-chart-swatch--objects" aria-hidden="true" /> Objects</span>
-              <span class="stats-chart-legend-item"><span class="stats-chart-swatch stats-chart-swatch--authors" aria-hidden="true" /> Authors</span>
-            </div>
+          </template>
+        </template>
+      </Card>
+
+      <Card class="author-leaderboard-card stats-leaderboard-row__leader">
+        <template #title>Contributor spotlight</template>
+        <template #content>
+          <p class="author-leaderboard-intro m-0 mb-3 text-color-secondary">
+            Top model authors in the catalog — a small nod to the people behind the pixels.
+          </p>
+          <p v-if="authorLeaderboardLoading" class="m-0">Loading…</p>
+          <p v-else-if="authorLeaderboardError" class="m-0 text-color-secondary">{{ authorLeaderboardError }}</p>
+          <p v-else-if="!authorLeaderboard" class="m-0 text-color-secondary">Contributor list is not available right now.</p>
+          <div v-else class="author-leaderboard-grid">
+            <section class="author-leaderboard-column" aria-labelledby="leaderboard-recent-heading">
+              <h3 id="leaderboard-recent-heading" class="author-leaderboard-subtitle">
+                Last {{ authorLeaderboard.recentDays }} days
+              </h3>
+              <p class="author-leaderboard-hint m-0 mb-2 text-color-secondary">
+                Busiest editors by recently updated models.
+              </p>
+              <ol v-if="authorLeaderboard.recent.length" class="author-leaderboard-list list-none p-0 m-0">
+                <li
+                  v-for="(row, i) in authorLeaderboard.recent"
+                  :key="'r-' + row.id"
+                  class="author-leaderboard-row flex align-items-center gap-2 py-2 border-bottom-1 surface-border"
+                >
+                  <span class="author-leaderboard-rank" :class="'author-leaderboard-rank--' + (i + 1)" aria-hidden="true">
+                    {{ i + 1 }}
+                  </span>
+                  <router-link :to="`/authors/${row.id}`" class="author-leaderboard-name object-model-link">
+                    {{ (row.name ?? '').trim() || 'Unnamed' }}
+                  </router-link>
+                  <span class="author-leaderboard-count ml-auto text-color-secondary">{{ formatLeaderCount(row.count) }}</span>
+                </li>
+              </ol>
+              <p v-else class="m-0 text-color-secondary">Quiet stretch — nothing to rank for this window yet.</p>
+            </section>
+            <section class="author-leaderboard-column" aria-labelledby="leaderboard-alltime-heading">
+              <h3 id="leaderboard-alltime-heading" class="author-leaderboard-subtitle">All time</h3>
+              <p class="author-leaderboard-hint m-0 mb-2 text-color-secondary">
+                Most models credited in the repository (still active).
+              </p>
+              <ol v-if="authorLeaderboard.allTime.length" class="author-leaderboard-list list-none p-0 m-0">
+                <li
+                  v-for="(row, i) in authorLeaderboard.allTime"
+                  :key="'a-' + row.id"
+                  class="author-leaderboard-row flex align-items-center gap-2 py-2 border-bottom-1 surface-border"
+                >
+                  <span class="author-leaderboard-rank" :class="'author-leaderboard-rank--' + (i + 1)" aria-hidden="true">
+                    {{ i + 1 }}
+                  </span>
+                  <router-link :to="`/authors/${row.id}`" class="author-leaderboard-name object-model-link">
+                    {{ (row.name ?? '').trim() || 'Unnamed' }}
+                  </router-link>
+                  <span class="author-leaderboard-count ml-auto text-color-secondary">{{ formatLeaderCount(row.count) }}</span>
+                </li>
+              </ol>
+              <p v-else class="m-0 text-color-secondary">No authors to show yet.</p>
+            </section>
           </div>
         </template>
-      </template>
-    </Card>
+      </Card>
+    </div>
 
     <Card class="mb-4">
       <template #title>News</template>
@@ -218,6 +280,27 @@ interface StatsHistoryPoint {
 }
 
 const statsSeries = ref<StatsHistoryPoint[]>([])
+
+interface AuthorLeaderboardEntry {
+  id: number
+  name: string | null
+  count: number
+}
+
+interface AuthorLeaderboardPayload {
+  recentDays: number
+  recent: AuthorLeaderboardEntry[]
+  allTime: AuthorLeaderboardEntry[]
+}
+
+const authorLeaderboard = ref<AuthorLeaderboardPayload | null>(null)
+const authorLeaderboardLoading = ref(true)
+const authorLeaderboardError = ref<string | null>(null)
+
+function formatLeaderCount(n: number) {
+  if (!Number.isFinite(n)) return '0'
+  return `${n.toLocaleString()} model${n === 1 ? '' : 's'}`
+}
 
 /**
  * Wide viewBox so `preserveAspectRatio="meet"` tends to scale from width (not height) on
@@ -500,9 +583,10 @@ watch(recentModelsError, (msg) => {
 
 onMounted(async () => {
   try {
-    const [resLatest, resHist] = await Promise.all([
+    const [resLatest, resHist, resLb] = await Promise.all([
       fetch(auth.apiUrl('/api/statistics')),
       fetch(auth.apiUrl('/api/statistics/history')),
+      fetch(auth.apiUrl('/api/statistics/author-contributions')),
     ])
     if (resLatest.ok) {
       const data = await resLatest.json()
@@ -525,9 +609,35 @@ onMounted(async () => {
           typeof p.authors === 'number'
       )
     }
+    if (resLb.ok) {
+      const lb = await resLb.json()
+      const recentDays = typeof lb.recentDays === 'number' ? lb.recentDays : 180
+      const recent = Array.isArray(lb.recent) ? lb.recent : []
+      const allTime = Array.isArray(lb.allTime) ? lb.allTime : []
+      const norm = (rows: unknown[]): AuthorLeaderboardEntry[] =>
+        rows
+          .map((r) => {
+            if (!r || typeof r !== 'object') return null
+            const o = r as Record<string, unknown>
+            const id = Number(o.id)
+            const count = Number(o.count)
+            if (!Number.isInteger(id) || id < 1 || !Number.isFinite(count)) return null
+            const name = o.name == null ? null : String(o.name)
+            return { id, name, count }
+          })
+          .filter((x): x is AuthorLeaderboardEntry => x != null)
+      authorLeaderboard.value = {
+        recentDays,
+        recent: norm(recent),
+        allTime: norm(allTime),
+      }
+    } else if (!resLb.ok && resLb.status !== 404) {
+      authorLeaderboardError.value = resLb.statusText || 'Could not load leaderboard'
+    }
   } catch (_) { /* ignore */ }
   finally {
     statsLoading.value = false
+    authorLeaderboardLoading.value = false
   }
 
   try {
@@ -591,6 +701,103 @@ onMounted(async () => {
 .news-more-link { text-decoration: none; color: var(--p-primary-color); }
 .mt-2 { margin-top: 0.5rem; }
 .mb-3 { margin-bottom: 0.75rem; }
+
+.stats-leaderboard-row {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    'stats'
+    'leader';
+}
+
+.stats-leaderboard-row__stats {
+  grid-area: stats;
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.stats-leaderboard-row__leader {
+  grid-area: leader;
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .stats-leaderboard-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: 'leader stats';
+    align-items: start;
+  }
+}
+
+.author-leaderboard-intro {
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.author-leaderboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .author-leaderboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.author-leaderboard-subtitle {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+}
+
+.author-leaderboard-hint {
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.author-leaderboard-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  background: var(--p-content-background, #f1f5f9);
+  color: var(--p-text-muted-color, #64748b);
+}
+
+.author-leaderboard-rank--1 {
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 18%, transparent);
+  color: var(--p-primary-color, #2563eb);
+}
+
+.author-leaderboard-rank--2 {
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 10%, transparent);
+}
+
+.author-leaderboard-rank--3 {
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 6%, transparent);
+}
+
+.author-leaderboard-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ml-auto {
+  margin-left: auto;
+  flex-shrink: 0;
+}
 
 .stats-chart-empty {
   padding-top: 0.5rem;
