@@ -1,10 +1,12 @@
 <template>
   <div
+    ref="shellRef"
     class="object-map-shell object-map-container"
     :class="{
       'object-map-compact': compact,
       'object-map-selectable': selectionMode && !selectionDraggable,
       'object-map-draggable-selection': selectionMode && selectionDraggable,
+      'object-map-measuring': measureActive,
     }"
   >
     <div ref="containerRef" class="object-map-maplibre-root"></div>
@@ -51,6 +53,32 @@
           >
         </div>
       </div>
+      <div
+        v-if="mapContextMenuOpen"
+        ref="mapContextMenuRef"
+        class="map-context-menu"
+        role="menu"
+        :style="{ left: `${mapContextMenuOpen.x}px`, top: `${mapContextMenuOpen.y}px` }"
+      >
+        <button type="button" class="map-context-menu__item" role="menuitem" @click="onCopyContextMenuLatLng">
+          Copy lng/lat to clipboard
+        </button>
+        <button type="button" class="map-context-menu__item" role="menuitem" @click="onMeasureFromContextMenu">
+          Measure
+        </button>
+      </div>
+      <div
+        v-if="measureActive"
+        class="map-measure-hud"
+        role="status"
+        aria-live="polite"
+        :style="{ left: `${measureActive.hudX}px`, top: `${measureActive.hudY}px` }"
+      >
+        <div class="map-measure-hud__row map-measure-hud__heading">
+          {{ measureActive.distanceM < 1 ? '—' : `${measureActive.headingDeg.toFixed(1)}°` }}
+        </div>
+        <div class="map-measure-hud__row map-measure-hud__dist">{{ formatMeasureDistance(measureActive.distanceM) }}</div>
+      </div>
     </div>
   </div>
 </template>
@@ -58,6 +86,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import InputText from 'primevue/inputtext'
+import { useAppToast } from '@/composables/useAppToast'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
@@ -156,11 +185,31 @@ const props = defineProps({
   showAirportIcaoSearch: { type: Boolean, default: false },
   /** Base path without trailing ICAO (e.g. /api/airports/by-icao). */
   airportLookupBasePath: { type: String, default: '/api/airports/by-icao' },
+  /** Right-click menu on the map (e.g. main Map view). */
+  mapContextMenu: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['object-click', 'position-select', 'view-change'])
 
+const { toastSuccess, toastWarn } = useAppToast()
+
 const containerRef = ref(null)
+const shellRef = ref(null)
+const mapContextMenuRef = ref(null)
+
+type MeasureActiveState = {
+  anchorLat: number
+  anchorLng: number
+  cursorLat: number
+  cursorLng: number
+  hudX: number
+  hudY: number
+  headingDeg: number
+  distanceM: number
+}
+
+/** Right-click "Measure" mode: arrow at anchor, line to cursor, HUD with bearing + distance. */
+const measureActive = ref<MeasureActiveState | null>(null)
 
 /** Bottom-left readout while cursor is over the map (mousemove). */
 const pointerReadout = ref(null)
@@ -227,6 +276,336 @@ function wrapLongitude(lng: number): number {
 
 function clampLatitude(lat: number): number {
   return Math.max(-90, Math.min(90, lat))
+}
+
+function formatLatLngForClipboard(lat: number, lng: number): string {
+  return `${clampLatitude(lat).toFixed(6)} ${wrapLongitude(lng).toFixed(6)}`
+}
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.position = 'fixed'
+      ta.style.left = '-9999px'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    } catch {
+      return false
+    }
+  }
+}
+
+type MapContextMenuState = { x: number; y: number; lat: number; lng: number }
+
+/** Screen position inside shell + coordinates at click (decimal lat/lng). */
+const mapContextMenuOpen = ref<MapContextMenuState | null>(null)
+
+function closeMapContextMenu() {
+  mapContextMenuOpen.value = null
+}
+
+function openMapContextMenuFromMapEvent(e: maplibregl.MapMouseEvent) {
+  const shell = shellRef.value
+  if (!shell) return
+  const rect = shell.getBoundingClientRect()
+  const lat = clampLatitude(e.lngLat.lat)
+  const lng = wrapLongitude(e.lngLat.lng)
+  const rawX = e.originalEvent.clientX - rect.left
+  const rawY = e.originalEvent.clientY - rect.top
+  const pad = 4
+  const maxX = Math.max(pad, rect.width - 200)
+  const maxY = Math.max(pad, rect.height - 48)
+  mapContextMenuOpen.value = {
+    x: Math.min(Math.max(pad, rawX), maxX),
+    y: Math.min(Math.max(pad, rawY), maxY),
+    lat,
+    lng,
+  }
+}
+
+function onPointerDownDismissContextMenu(ev: PointerEvent) {
+  if (!mapContextMenuOpen.value) return
+  const panel = mapContextMenuRef.value
+  if (panel?.contains(ev.target as Node)) return
+  closeMapContextMenu()
+}
+
+function onKeyDownDismissContextMenu(ev: KeyboardEvent) {
+  if (!mapContextMenuOpen.value) return
+  if (ev.key === 'Escape') closeMapContextMenu()
+}
+
+watch(mapContextMenuOpen, (open) => {
+  if (open) {
+    document.addEventListener('pointerdown', onPointerDownDismissContextMenu, true)
+    document.addEventListener('keydown', onKeyDownDismissContextMenu, true)
+  } else {
+    document.removeEventListener('pointerdown', onPointerDownDismissContextMenu, true)
+    document.removeEventListener('keydown', onKeyDownDismissContextMenu, true)
+  }
+})
+
+async function onCopyContextMenuLatLng() {
+  const m = mapContextMenuOpen.value
+  if (!m) return
+  const text = formatLatLngForClipboard(m.lat, m.lng)
+  const ok = await copyTextToClipboard(text)
+  closeMapContextMenu()
+  if (ok) toastSuccess('lng/lat copied to clipboard', 'Copied')
+  else toastWarn('Clipboard was not available.', 'Copy failed')
+}
+
+const MEASURE_SOURCE_ID = 'measure-ruler'
+const MEASURE_LINE_LAYER_ID = 'measure-ruler-line'
+const MEASURE_ARROW_LAYER_ID = 'measure-ruler-arrow'
+const MEASURE_ARROW_ICON = 'measure-arrow'
+const MEASURE_EARTH_RADIUS_M = 6371000
+
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const p1 = (lat1 * Math.PI) / 180
+  const p2 = (lat2 * Math.PI) / 180
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(p1) * Math.cos(p2) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)))
+  return MEASURE_EARTH_RADIUS_M * c
+}
+
+/** Degrees clockwise from true north (0–360): initial bearing from (lat1,lng1) toward (lat2,lng2). */
+function bearingDegrees(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const φ1 = (lat1 * Math.PI) / 180
+  const φ2 = (lat2 * Math.PI) / 180
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180
+  const y = Math.sin(Δλ) * Math.cos(φ2)
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ)
+  const θ = (Math.atan2(y, x) * 180) / Math.PI
+  return (θ + 360) % 360
+}
+
+function formatMeasureDistance(meters: number): string {
+  if (!Number.isFinite(meters)) return '—'
+  if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`
+  if (meters >= 1) return `${meters.toFixed(0)} m`
+  return `${(meters * 100).toFixed(0)} cm`
+}
+
+function createMeasureArrowImageData() {
+  const size = 26
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  const c = size / 2
+  const r = size * 0.42
+  ctx.fillStyle = '#b45309'
+  ctx.strokeStyle = '#fff'
+  ctx.lineWidth = 1.25
+  ctx.beginPath()
+  ctx.moveTo(c, c - r)
+  ctx.lineTo(c + r * 0.58, c + r * 0.48)
+  ctx.lineTo(c - r * 0.58, c + r * 0.48)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  const imgData = ctx.getImageData(0, 0, size, size)
+  return { width: size, height: size, data: imgData.data }
+}
+
+function clearMeasureGeo() {
+  const src = map?.getSource(MEASURE_SOURCE_ID)
+  if (src && src.type === 'geojson') {
+    src.setData({ type: 'FeatureCollection', features: [] })
+  }
+}
+
+function ensureMeasureRulerLayers(): boolean {
+  if (!map?.isStyleLoaded()) return false
+  if (!map.getSource(MEASURE_SOURCE_ID)) {
+    const img = createMeasureArrowImageData()
+    if (img && !map.hasImage(MEASURE_ARROW_ICON)) map.addImage(MEASURE_ARROW_ICON, img)
+    map.addSource(MEASURE_SOURCE_ID, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    })
+    map.addLayer({
+      id: MEASURE_LINE_LAYER_ID,
+      type: 'line',
+      source: MEASURE_SOURCE_ID,
+      filter: ['==', ['get', 'kind'], 'line'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#b45309',
+        'line-width': 3,
+        'line-dasharray': [2, 2],
+      },
+    })
+    map.addLayer({
+      id: MEASURE_ARROW_LAYER_ID,
+      type: 'symbol',
+      source: MEASURE_SOURCE_ID,
+      filter: ['==', ['get', 'kind'], 'arrow'],
+      layout: {
+        'icon-image': MEASURE_ARROW_ICON,
+        'icon-size': 0.78,
+        'icon-rotate': ['get', 'bearing'],
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        'icon-anchor': 'center',
+      },
+    })
+  }
+  return true
+}
+
+function stopMeasureMode() {
+  document.removeEventListener('keydown', onKeyDownMeasureEscape, true)
+  measureActive.value = null
+  clearMeasureGeo()
+}
+
+function onKeyDownMeasureEscape(ev: KeyboardEvent) {
+  if (ev.key !== 'Escape' || !measureActive.value) return
+  stopMeasureMode()
+  ev.preventDefault()
+}
+
+function layoutMeasureHudPx(px: number, py: number): { hudX: number; hudY: number } {
+  const shell = shellRef.value
+  if (!shell) return { hudX: 12, hudY: 12 }
+  const rect = shell.getBoundingClientRect()
+  const pad = 8
+  const hudW = 120
+  const hudH = 44
+  let hudX = px + pad
+  let hudY = py - hudH - pad
+  if (hudX + hudW > rect.width - 4) hudX = Math.max(4, rect.width - hudW - 4)
+  if (hudX < 4) hudX = 4
+  if (hudY < 4) hudY = py + pad
+  if (hudY + hudH > rect.height - 4) hudY = Math.max(4, rect.height - hudH - 4)
+  return { hudX, hudY }
+}
+
+function refreshMeasureHudScreenCoords() {
+  const st = measureActive.value
+  if (!st || !map || !shellRef.value) return
+  const p = map.project([st.cursorLng, st.cursorLat])
+  const { hudX, hudY } = layoutMeasureHudPx(p.x, p.y)
+  measureActive.value = { ...st, hudX, hudY }
+}
+
+function updateMeasureFromMouseEvent(e: maplibregl.MapMouseEvent) {
+  const st = measureActive.value
+  if (!st || !map) return
+  if (!ensureMeasureRulerLayers()) return
+  const curLat = clampLatitude(e.lngLat.lat)
+  const curLng = wrapLongitude(e.lngLat.lng)
+  const aLat = st.anchorLat
+  const aLng = st.anchorLng
+  const dist = haversineMeters(aLat, aLng, curLat, curLng)
+  const brg = dist < 0.5 ? 0 : bearingDegrees(aLat, aLng, curLat, curLng)
+
+  const src = map.getSource(MEASURE_SOURCE_ID)
+  if (src && src.type === 'geojson') {
+    src.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { kind: 'line' },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [aLng, aLat],
+              [curLng, curLat],
+            ],
+          },
+        },
+        {
+          type: 'Feature',
+          properties: { kind: 'arrow', bearing: brg },
+          geometry: { type: 'Point', coordinates: [aLng, aLat] },
+        },
+      ],
+    })
+  }
+
+  const p = map.project([curLng, curLat])
+  const { hudX, hudY } = layoutMeasureHudPx(p.x, p.y)
+  measureActive.value = {
+    anchorLat: aLat,
+    anchorLng: aLng,
+    cursorLat: curLat,
+    cursorLng: curLng,
+    hudX,
+    hudY,
+    headingDeg: brg,
+    distanceM: dist,
+  }
+}
+
+function onMeasureFromContextMenu() {
+  const m = mapContextMenuOpen.value
+  if (!m || !map) return
+  const aLat = m.lat
+  const aLng = m.lng
+  closeMapContextMenu()
+
+  function beginMeasure() {
+    if (!map) return
+    if (!ensureMeasureRulerLayers()) return
+    const p = map.project([aLng, aLat])
+    const { hudX, hudY } = layoutMeasureHudPx(p.x, p.y)
+    measureActive.value = {
+      anchorLat: aLat,
+      anchorLng: aLng,
+      cursorLat: aLat,
+      cursorLng: aLng,
+      hudX,
+      hudY,
+      headingDeg: 0,
+      distanceM: 0,
+    }
+    const src = map.getSource(MEASURE_SOURCE_ID)
+    if (src && src.type === 'geojson') {
+      src.setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { kind: 'line' },
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [aLng, aLat],
+                [aLng, aLat],
+              ],
+            },
+          },
+          {
+            type: 'Feature',
+            properties: { kind: 'arrow', bearing: 0 },
+            geometry: { type: 'Point', coordinates: [aLng, aLat] },
+          },
+        ],
+      })
+    }
+    document.addEventListener('keydown', onKeyDownMeasureEscape, true)
+  }
+
+  if (map.isStyleLoaded()) beginMeasure()
+  else map.once('load', beginMeasure)
 }
 
 /** Format one angle as degrees° minutes′ seconds″ hemisphere (zero-padded for stable width). */
@@ -614,6 +993,19 @@ onMounted(() => {
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right')
 
+  if (props.mapContextMenu) {
+    map.on('contextmenu', (e) => {
+      e.originalEvent.preventDefault()
+      if (measureActive.value) {
+        stopMeasureMode()
+        return
+      }
+      openMapContextMenuFromMapEvent(e)
+    })
+    map.on('movestart', closeMapContextMenu)
+    map.on('wheel', closeMapContextMenu)
+  }
+
   map.on('mousemove', (e) => {
     const lat = clampLatitude(e.lngLat.lat)
     const lng = wrapLongitude(e.lngLat.lng)
@@ -624,9 +1016,14 @@ onMounted(() => {
       decLat: lat.toFixed(6),
       decLon: lng.toFixed(6),
     }
+    if (measureActive.value) updateMeasureFromMouseEvent(e)
   })
   map.on('mouseout', () => {
     pointerReadout.value = null
+  })
+
+  map.on('move', () => {
+    if (measureActive.value) refreshMeasureHudScreenCoords()
   })
 
   function updateFgTileGrid() {
@@ -815,13 +1212,37 @@ onMounted(() => {
     if (f?.properties?.id != null) emit('object-click', f.properties.id)
   })
 
+  /** MapLibre CSS sets `cursor: grab` on `.maplibregl-canvas-container.maplibregl-interactive`; set cursor on that node so hover states win. */
   const setCursor = (cursor) => {
-    if (containerRef.value) containerRef.value.style.cursor = cursor
+    const next =
+      cursor && String(cursor).length > 0
+        ? cursor
+        : props.selectionMode && props.selectionDraggable
+          ? 'grab'
+          : 'crosshair'
+    const canvasContainer = map.getCanvasContainer()
+    const canvas = map.getCanvas()
+    if (canvasContainer) canvasContainer.style.cursor = next
+    if (canvas) canvas.style.cursor = next
+    if (containerRef.value) containerRef.value.style.cursor = next
   }
   map.on('mouseenter', 'object-clusters', () => setCursor('pointer'))
   map.on('mouseleave', 'object-clusters', () => setCursor(''))
+  map.on('mouseenter', 'object-cluster-count', () => setCursor('pointer'))
+  map.on('mouseleave', 'object-cluster-count', () => setCursor(''))
   map.on('mouseenter', 'object-markers', () => setCursor('pointer'))
   map.on('mouseleave', 'object-markers', () => setCursor(''))
+
+  /** MapLibre sets `grab` on the canvas container; apply our default (crosshair / grab) once it exists. */
+  function primeDefaultMapCursor() {
+    requestAnimationFrame(() => {
+      if (!map) return
+      setCursor('')
+    })
+  }
+  if (map.loaded()) primeDefaultMapCursor()
+  else map.once('load', primeDefaultMapCursor)
+  map.once('idle', primeDefaultMapCursor)
 })
 
 watch(
@@ -894,6 +1315,9 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  stopMeasureMode()
+  document.removeEventListener('pointerdown', onPointerDownDismissContextMenu, true)
+  document.removeEventListener('keydown', onKeyDownDismissContextMenu, true)
   if (viewportFetchTimeout) clearTimeout(viewportFetchTimeout)
   if (fgTileGridDebounceTimer) clearTimeout(fgTileGridDebounceTimer)
   if (fgGridIdleFallbackTimer) clearTimeout(fgGridIdleFallbackTimer)
@@ -926,6 +1350,14 @@ onBeforeUnmount(() => {
 .object-map-maplibre-root {
   width: 100%;
   height: 100%;
+  cursor: crosshair;
+}
+.object-map-draggable-selection .object-map-maplibre-root {
+  cursor: grab;
+}
+.object-map-maplibre-root :deep(.maplibregl-ctrl button),
+.object-map-maplibre-root :deep(.maplibregl-ctrl-group button) {
+  cursor: pointer;
 }
 .map-html-overlays {
   position: absolute;
@@ -1046,6 +1478,59 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(148, 163, 184, 0.2);
   backdrop-filter: blur(4px);
 }
+.map-context-menu {
+  position: absolute;
+  z-index: 40;
+  min-width: 11rem;
+  padding: 4px 0;
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+.map-context-menu__item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: #0f172a;
+  cursor: pointer;
+}
+.map-context-menu__item:hover,
+.map-context-menu__item:focus-visible {
+  background: rgba(241, 245, 249, 0.95);
+  outline: none;
+}
+
+.map-measure-hud {
+  position: absolute;
+  z-index: 35;
+  min-width: 6.5rem;
+  padding: 6px 10px;
+  pointer-events: none;
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 6px;
+  border: 1px solid rgba(180, 83, 9, 0.45);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+.map-measure-hud__heading {
+  font-weight: 600;
+  color: #9a3412;
+}
+.map-measure-hud__dist {
+  color: #334155;
+}
+
 .map-airport-search__msg--err {
   color: #9f1239;
   border-color: rgba(244, 63, 94, 0.22);

@@ -7,6 +7,7 @@
             :map-objects-api-url="auth.apiUrl('/api/objects/map')"
             :initial-center="initialCenter"
             :initial-zoom="initialZoom"
+            map-context-menu
             show-airport-icao-search
             :airport-lookup-base-path="auth.apiUrl('/api/airports/by-icao')"
             sync-view-to-history
