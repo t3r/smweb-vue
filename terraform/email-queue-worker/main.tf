@@ -51,7 +51,7 @@ resource "aws_lambda_function" "worker" {
   function_name = var.function_name
   role          = aws_iam_role.lambda.arn
   handler       = "src/handler.handler"
-  runtime       = "nodejs22.x"
+  runtime       = "nodejs24.x"
   architectures = ["arm64"]
 
   filename         = var.lambda_zip_path
