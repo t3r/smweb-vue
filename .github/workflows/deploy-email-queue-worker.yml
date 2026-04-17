@@ -99,4 +99,5 @@ jobs:
             -var="lambda_zip_path=../../lambda/email-queue-worker/bundle.zip" \
             -var="api_base_url=${{ vars.API_BASE_URL }}" \
             -var='ses_from=${{ vars.SES_FROM }}' \
-            -var="notify_reviewer_emails=${{ vars.NOTIFY_REVIEWER_EMAILS }}"
+            -var="notify_reviewer_emails=${{ vars.NOTIFY_REVIEWER_EMAILS }}" \
+            -var="schedule_expression=${{ vars.SCHEDULE_EXPRESSION }}"
