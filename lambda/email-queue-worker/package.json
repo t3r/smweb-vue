@@ -9,7 +9,7 @@
     "zip": "rm -f bundle.zip && zip -r bundle.zip package.json src templates node_modules -x '*/.DS_Store'"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.1028.0",
+    "@aws-sdk/client-ses": "^3.1031.0",
     "handlebars": "^4.7.8"
   }
 }
