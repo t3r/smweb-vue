@@ -29,10 +29,14 @@
         <p class="m-0 text-color-secondary">Preview not available (model not yet in database)</p>
       </div>
       <div class="model-content-files">
-        <template v-if="hasModelId">
-          <p class="m-0 mb-2">
+        <template v-if="hasModelId || requestSig">
+          <p v-if="requestSig && filename" class="m-0 mb-2 text-color-secondary">
+            Submitted filename: {{ filename }}
+          </p>
+          <p v-if="packageDownloadUrl !== '#'" class="m-0 mb-2">
             <a :href="packageDownloadUrl" class="download-link" download>
-              <i class="pi pi-download"></i> Download model package (.tar.gz)
+              <i class="pi pi-download"></i>
+              {{ hasModelId ? 'Download model package (.tar.gz)' : 'Download submission package (.tar.gz)' }}
             </a>
           </p>
           <p v-if="filesLoading" class="m-0">Loading file list…</p>
@@ -45,7 +49,19 @@
           >
             <Column field="name" header="Filename">
               <template #body="{ data }">
-                <a :href="fileDownloadUrl(data.name)" :download="data.name" class="file-link">{{ data.name }}</a>
+                <TextureFilenameCell
+                  :name="data.name"
+                  :href="fileDownloadUrl(data.name)"
+                  :is-texture="isRasterTextureFilename(data.name)"
+                  :dimensions="textureDimsByName[data.name]"
+                />
+              </template>
+            </Column>
+            <Column header="Dimensions">
+              <template #body="{ data }">
+                <span v-if="!isRasterTextureFilename(data.name)" class="text-color-secondary">—</span>
+                <span v-else-if="!(data.name in textureDimsByName)" class="text-color-secondary">…</span>
+                <span v-else>{{ formatTextureDimensions(textureDimsByName[data.name] ?? null) }}</span>
               </template>
             </Column>
             <Column field="size" header="Size">
@@ -69,7 +85,13 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import Panel from 'primevue/panel'
 import ModelViewer3d from '@/components/ModelViewer3d.vue'
+import TextureFilenameCell from '@/components/TextureFilenameCell.vue'
 import { useAuthStore } from '@/stores/auth'
+import {
+  isRasterTextureFilename,
+  probeRasterImageDimensions,
+  formatTextureDimensions,
+} from '@/utils/textureFileMeta'
 
 const auth = useAuthStore()
 
@@ -86,6 +108,8 @@ const props = withDefaults(
 
 const modelFiles = ref<{ name: string; size?: number }[]>([])
 const filesLoading = ref(false)
+/** Raster texture filenames → decoded pixel size, or `null` if probe failed */
+const textureDimsByName = ref<Record<string, { width: number; height: number } | null>>({})
 const previewData = ref<unknown>(null)
 const previewLoading = ref(false)
 const requestPreviewLoading = ref(false)
@@ -95,14 +119,29 @@ const hasModelId = computed(() => props.modelId != null && Number.isFinite(Numbe
 const previewWidth = computed(() => (props.compact ? 180 : 240))
 const previewHeight = computed(() => (props.compact ? 135 : 180))
 
-const packageDownloadUrl = computed(() =>
-  hasModelId.value ? `/api/models/${props.modelId}/package` : '#'
-)
+const packageDownloadUrl = computed(() => {
+  if (hasModelId.value && props.modelId != null) {
+    return auth.apiUrl(`/api/models/${props.modelId}/package`)
+  }
+  if (props.requestSig) {
+    return auth.apiUrl(`/api/position-requests/${encodeURIComponent(props.requestSig)}/package`)
+  }
+  return '#'
+})
 
 function fileDownloadUrl(name: string) {
-  if (!hasModelId.value || !name) return '#'
-  return `/api/models/${props.modelId}/file?name=${encodeURIComponent(name)}`
+  if (!name) return '#'
+  const q = `?name=${encodeURIComponent(name)}`
+  if (hasModelId.value && props.modelId != null) {
+    return auth.apiUrl(`/api/models/${props.modelId}/file${q}`)
+  }
+  if (props.requestSig) {
+    return auth.apiUrl(`/api/position-requests/${encodeURIComponent(props.requestSig)}/file${q}`)
+  }
+  return '#'
 }
+
+let textureDimGeneration = 0
 
 function formatBytes(bytes: unknown) {
   if (bytes == null || !Number.isFinite(Number(bytes)) || Number(bytes) < 0) return '—'
@@ -121,7 +160,7 @@ async function fetchFiles() {
   filesLoading.value = true
   modelFiles.value = []
   try {
-    const res = await fetch(`/api/models/${id}/files`)
+    const res = await fetch(auth.apiUrl(`/api/models/${id}/files`), { credentials: 'include' })
     if (res.ok) {
       const data = await res.json()
       modelFiles.value = data.files || []
@@ -171,16 +210,58 @@ async function fetchRequestPreview() {
   }
 }
 
+async function fetchRequestFiles() {
+  const sig = props.requestSig
+  if (!sig || typeof sig !== 'string') return
+  filesLoading.value = true
+  modelFiles.value = []
+  try {
+    const res = await fetch(auth.apiUrl(`/api/position-requests/${encodeURIComponent(sig)}/model-files`), {
+      credentials: 'include',
+    })
+    if (res.ok) {
+      const data = await res.json()
+      modelFiles.value = data.files || []
+    }
+  } catch {
+    modelFiles.value = []
+  } finally {
+    filesLoading.value = false
+  }
+}
+
 function loadContent() {
   if (hasModelId.value) {
     fetchFiles()
     fetchPreview()
     return
   }
-  if (props.requestSig) fetchRequestPreview()
+  if (props.requestSig) {
+    fetchRequestPreview()
+    fetchRequestFiles()
+  }
 }
 
 onMounted(loadContent)
+watch(
+  modelFiles,
+  (files) => {
+    textureDimGeneration++
+    const gen = textureDimGeneration
+    textureDimsByName.value = {}
+    for (const f of files) {
+      if (!isRasterTextureFilename(f.name)) continue
+      const name = f.name
+      const url = fileDownloadUrl(name)
+      void probeRasterImageDimensions(url).then((dims) => {
+        if (gen !== textureDimGeneration) return
+        textureDimsByName.value = { ...textureDimsByName.value, [name]: dims }
+      })
+    }
+  },
+  { deep: true }
+)
+
 watch(() => [props.modelId, props.requestSig], loadContent)
 </script>
 

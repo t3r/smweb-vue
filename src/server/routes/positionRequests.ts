@@ -6,6 +6,9 @@ const router = express.Router()
 
 router.get('/', requireAuth, requireRole('reviewer'), positionRequestsController.getList)
 router.get('/:sig/model-preview', requireAuth, requireRole('reviewer'), positionRequestsController.getModelPreview)
+router.get('/:sig/model-files', requireAuth, requireRole('reviewer'), positionRequestsController.getRequestModelFiles)
+router.get('/:sig/file', requireAuth, requireRole('reviewer'), positionRequestsController.getRequestModelFile)
+router.get('/:sig/package', requireAuth, requireRole('reviewer'), positionRequestsController.getRequestModelPackage)
 router.get('/:sig/thumbnail', requireAuth, requireRole('reviewer'), positionRequestsController.getRequestModelThumbnail)
 router.get('/:sig', requireAuth, requireRole('reviewer'), positionRequestsController.getBySig)
 
