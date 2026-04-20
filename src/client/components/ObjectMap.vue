@@ -3,7 +3,8 @@
     ref="shellRef"
     class="object-map-shell object-map-container"
     :class="{
-      'object-map-compact': compact,
+      'object-map-compact': compact && !responsiveViewportHeight,
+      'object-map-responsive-vh': responsiveViewportHeight,
       'object-map-selectable': selectionMode && !selectionDraggable,
       'object-map-draggable-selection': selectionMode && selectionDraggable,
       'object-map-measuring': measureActive,
@@ -167,6 +168,12 @@ const props = defineProps({
   fitToSelection: { type: Boolean, default: false },
   /** Compact height for use inside a panel */
   compact: { type: Boolean, default: false },
+  /** When true, map height follows viewport (min vw / min vh) for wide layouts; disables compact height lock. */
+  responsiveViewportHeight: { type: Boolean, default: false },
+  /** Hover popup on object-markers with model thumbnail + name (expects objects with modelId; optional modelName). */
+  markerHoverCard: { type: Boolean, default: false },
+  /** Base URL for model thumbnails, e.g. from `auth.apiUrl('/api')`. Empty = same-origin `/api`. */
+  resourceApiBase: { type: String, default: '' },
   /** Initial center [lng, lat] when not fitting to selection */
   initialCenter: { type: Array, default: () => [10, 53.5] },
   /** Initial zoom when not fitting to selection */
@@ -636,8 +643,15 @@ let suppressViewHistoryEmit = false
 let lastSelfSyncedHistoryKey: string | null = null
 /** Draggable selection marker (selectionMode + selectionDraggable) */
 let selectionMarker = null
+/** MODEL_ADD / OBJECTS_ADD hover: single popup instance, recycled with setDOMContent */
+let markerHoverPopup: maplibregl.Popup | null = null
+let lastMarkerHoverKey = ''
 
 const useViewportFetch = computed(() => !!props.mapObjectsApiUrl)
+
+function markerIconsCompactLayout(): boolean {
+  return !!(props.compact && !props.responsiveViewportHeight)
+}
 
 const MARKER_SIZE = 32
 const MARKER_STATIC_COLOR = '#2563eb'
@@ -694,6 +708,10 @@ function objectsToGeoJSON(objects) {
     if (lat == null || lon == null || !Number.isFinite(lat) || !Number.isFinite(lon)) return null
     const heading = obj?.position?.heading != null && Number.isFinite(Number(obj.position.heading)) ? Number(obj.position.heading) : 0
     const shared = obj?.shared != null ? Number(obj.shared) : null
+    const rawMid = obj?.modelId
+    const modelId =
+      rawMid != null && rawMid !== '' && Number.isFinite(Number(rawMid)) && Number(rawMid) > 0 ? Number(rawMid) : null
+    const modelName = obj?.modelName != null ? String(obj.modelName) : ''
     return {
       type: 'Feature',
       id: obj.id,
@@ -703,6 +721,8 @@ function objectsToGeoJSON(objects) {
         type: obj.type ?? '',
         shared,
         heading,
+        modelId: modelId ?? '',
+        modelName,
       },
       geometry: {
         type: 'Point',
@@ -730,11 +750,101 @@ function fitMapToObjects() {
   const maxLng = Math.max(...lngs)
   const minLat = Math.min(...lats)
   const maxLat = Math.max(...lats)
-  const padding = Math.max(20, FIT_PADDING - (props.compact ? 20 : 0))
+  const padding = Math.max(20, FIT_PADDING - (markerIconsCompactLayout() ? 20 : 0))
   map.fitBounds(
     [[minLng, minLat], [maxLng, maxLat]],
     { padding, maxZoom: FIT_MAX_ZOOM }
   )
+}
+
+function hideMarkerHoverPopup() {
+  lastMarkerHoverKey = ''
+  if (markerHoverPopup) {
+    markerHoverPopup.remove()
+    markerHoverPopup = null
+  }
+}
+
+function parseFeatureModelHoverProps(f: { properties?: Record<string, unknown> } | undefined) {
+  const p = f?.properties || {}
+  const rawId = p.modelId
+  const modelId =
+    rawId != null && rawId !== '' && Number.isFinite(Number(rawId)) && Number(rawId) > 0 ? Number(rawId) : null
+  const modelName = p.modelName != null ? String(p.modelName) : ''
+  const description = p.description != null ? String(p.description) : ''
+  return { modelId, modelName, description }
+}
+
+function thumbnailUrlForModel(modelId: number): string {
+  const base = String(props.resourceApiBase || '/api').replace(/\/$/, '')
+  return `${base}/models/${modelId}/thumbnail`
+}
+
+function handleMarkerHoverMousemove(e: maplibregl.MapMouseEvent) {
+  if (!props.markerHoverCard || !map?.isStyleLoaded()) return
+  let hasLayer = false
+  try {
+    hasLayer = !!map.getLayer('object-markers')
+  } catch {
+    hasLayer = false
+  }
+  if (!hasLayer) {
+    hideMarkerHoverPopup()
+    return
+  }
+  const hits = map.queryRenderedFeatures(e.point, { layers: ['object-markers'] })
+  const f = hits[0]
+  if (!f || f.geometry?.type !== 'Point') {
+    hideMarkerHoverPopup()
+    return
+  }
+  const coords = f.geometry.coordinates
+  const lngLat: [number, number] = [Number(coords[0]), Number(coords[1])]
+  const meta = parseFeatureModelHoverProps(f)
+  if (!meta.modelId && !String(meta.description).trim()) {
+    hideMarkerHoverPopup()
+    return
+  }
+  const fid = f.properties?.id != null ? String(f.properties.id) : `${lngLat[0]},${lngLat[1]}`
+  if (fid === lastMarkerHoverKey && markerHoverPopup) return
+
+  const wrap = document.createElement('div')
+  wrap.className = 'object-map-marker-hover-card'
+  const title = document.createElement('div')
+  title.className = 'object-map-marker-hover-card__title'
+  const namePart =
+    meta.modelName.trim() ||
+    (meta.modelId != null ? `Model #${meta.modelId}` : 'Placement')
+  title.textContent = namePart
+  wrap.appendChild(title)
+  if (meta.modelId != null) {
+    const img = document.createElement('img')
+    img.className = 'object-map-marker-hover-card__img'
+    img.alt = ''
+    img.loading = 'lazy'
+    img.src = thumbnailUrlForModel(meta.modelId)
+    wrap.appendChild(img)
+  }
+  const desc = meta.description.trim()
+  if (desc && desc !== namePart) {
+    const d = document.createElement('div')
+    d.className = 'object-map-marker-hover-card__desc'
+    d.textContent = desc
+    wrap.appendChild(d)
+  }
+
+  if (!markerHoverPopup) {
+    markerHoverPopup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      focusAfterOpen: false,
+      offset: 16,
+      maxWidth: '280px',
+      className: 'object-map-marker-hover-popup',
+    })
+  }
+  markerHoverPopup.setLngLat(lngLat).setDOMContent(wrap).addTo(map)
+  lastMarkerHoverKey = fid
 }
 
 function getBboxFromMap() {
@@ -917,7 +1027,7 @@ function addViewportModeLayers() {
     filter: ['!', ['has', 'point_count']],
     layout: {
       'icon-image': ['match', ['get', 'shared'], 0, 'marker-static', 'marker-other'],
-      'icon-size': props.compact ? 0.65 : 0.85,
+      'icon-size': markerIconsCompactLayout() ? 0.65 : 0.85,
       'icon-rotate': ['get', 'heading'],
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
@@ -963,7 +1073,7 @@ function updateSource() {
       source: 'objects',
       layout: {
         'icon-image': ['match', ['get', 'shared'], 0, 'marker-static', 'marker-other'],
-        'icon-size': props.compact ? 0.65 : 0.85,
+        'icon-size': markerIconsCompactLayout() ? 0.65 : 0.85,
         'icon-rotate': ['get', 'heading'],
         'icon-allow-overlap': true,
         'icon-ignore-placement': true,
@@ -1017,9 +1127,11 @@ onMounted(() => {
       decLon: lng.toFixed(6),
     }
     if (measureActive.value) updateMeasureFromMouseEvent(e)
+    if (props.markerHoverCard) handleMarkerHoverMousemove(e)
   })
   map.on('mouseout', () => {
     pointerReadout.value = null
+    hideMarkerHoverPopup()
   })
 
   map.on('move', () => {
@@ -1259,6 +1371,14 @@ watch(
 )
 
 watch(
+  () => [props.objects, props.markerHoverCard, props.resourceApiBase],
+  () => {
+    hideMarkerHoverPopup()
+  },
+  { deep: true }
+)
+
+watch(
   () => props.selectionPosition,
   () => {
     if (!props.selectionMode) return
@@ -1315,6 +1435,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  hideMarkerHoverPopup()
   stopMeasureMode()
   document.removeEventListener('pointerdown', onPointerDownDismissContextMenu, true)
   document.removeEventListener('keydown', onKeyDownDismissContextMenu, true)
@@ -1369,6 +1490,12 @@ onBeforeUnmount(() => {
 .object-map-shell.object-map-compact {
   height: 240px;
   min-height: 160px;
+}
+/** Taller inset maps on wide viewports: scales with vw and vh (caps avoid excessive height). */
+.object-map-shell.object-map-responsive-vh {
+  height: clamp(220px, min(42vw, 62vh), 720px);
+  min-height: 220px;
+  max-height: min(72vh, 720px);
 }
 .map-pointer-readout {
   position: absolute;
@@ -1535,5 +1662,52 @@ onBeforeUnmount(() => {
   color: #9f1239;
   border-color: rgba(244, 63, 94, 0.22);
   background: rgba(255, 241, 242, 0.75);
+}
+</style>
+
+<style>
+/* MapLibre hoists popups outside the Vue root; keep these global. */
+.object-map-marker-hover-popup .maplibregl-popup-content {
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.object-map-marker-hover-card {
+  padding: 8px 10px 10px;
+  max-width: 260px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #0f172a;
+}
+.object-map-marker-hover-card__title {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+.object-map-marker-hover-card__img {
+  display: block;
+  width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #f1f5f9;
+}
+.object-map-marker-hover-card__desc {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #475569;
+  word-break: break-word;
+}
+.dark .object-map-marker-hover-card {
+  background: rgba(30, 41, 59, 0.98);
+  color: #f1f5f9;
+}
+.dark .object-map-marker-hover-card__img {
+  background: #0f172a;
+}
+.dark .object-map-marker-hover-card__desc {
+  color: #94a3b8;
 }
 </style>

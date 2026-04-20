@@ -95,6 +95,9 @@
                 <template v-else-if="data.type === 'OBJECT_UPDATE' && data.details?.objectId != null">
                   <ObjectUpdateRequestDetails :details="data.details" />
                 </template>
+                <template v-else-if="data.type === 'OBJECTS_ADD'">
+                  <ObjectsAddRequestDetails :details="data.details" />
+                </template>
                 <template v-else-if="data.type === 'MODEL_DELETE' && data.details?.modelId != null">
                   <p class="m-0">Request to delete model ID <router-link :to="'/models/' + data.details.modelId">{{ data.details.modelId }}</router-link>.</p>
                 </template>
@@ -172,6 +175,7 @@ import ModelContentCard from '@/components/ModelContentCard.vue'
 import ObjectMap from '@/components/ObjectMap.vue'
 import ObjectDetailsCardLoader from '@/components/ObjectDetailsCardLoader.vue'
 import ObjectUpdateRequestDetails from '@/components/ObjectUpdateRequestDetails.vue'
+import ObjectsAddRequestDetails from '@/components/ObjectsAddRequestDetails.vue'
 import type { ModelDetailsModel } from '@/components/ModelDetailsCard.vue'
 
 interface PendingItem {
