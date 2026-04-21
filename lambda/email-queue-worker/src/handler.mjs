@@ -94,6 +94,108 @@ function enrichAcceptedPayload(data) {
   }
 }
 
+/**
+ * Human-readable lines for reviewer "created" emails (HTML-escaped by Handlebars {{}}).
+ * @param {Record<string, unknown>} item
+ * @returns {{ label: string; value: string }[]}
+ */
+function summarizePositionRequestCreatedLines(item) {
+  /** @type {{ label: string; value: string }[]} */
+  const lines = []
+  const str = (v) => (v == null ? '' : String(v).trim())
+  const comment = str(item.comment)
+  if (comment) lines.push({ label: 'Submitter comment', value: comment.slice(0, 500) })
+
+  const rt = typeof item.requestType === 'string' ? item.requestType : ''
+  const raw = item.contentOverview
+  const o =
+    raw != null && typeof raw === 'object' && !Array.isArray(raw) ? /** @type {Record<string, unknown>} */ (raw) : null
+  const arr = Array.isArray(raw) ? raw : null
+
+  switch (rt) {
+    case 'MODEL_ADD': {
+      const m =
+        o?.model != null && typeof o.model === 'object' && !Array.isArray(o.model)
+          ? /** @type {Record<string, unknown>} */ (o.model)
+          : null
+      const ob =
+        o?.object != null && typeof o.object === 'object' && !Array.isArray(o.object)
+          ? /** @type {Record<string, unknown>} */ (o.object)
+          : null
+      const au =
+        o?.author != null && typeof o.author === 'object' && !Array.isArray(o.author)
+          ? /** @type {Record<string, unknown>} */ (o.author)
+          : null
+      if (m) {
+        if (str(m.name)) lines.push({ label: 'Model name', value: str(m.name) })
+        if (str(m.description)) lines.push({ label: 'Description', value: str(m.description).slice(0, 400) })
+        if (str(m.filename)) lines.push({ label: 'Filename', value: str(m.filename) })
+      }
+      if (ob && (ob.latitude != null || ob.longitude != null)) {
+        lines.push({ label: 'Placement (lat, lon)', value: `${str(ob.latitude)}, ${str(ob.longitude)}` })
+      }
+      if (au) {
+        const nm = str(au.name)
+        const em = str(au.email)
+        if (nm || em) lines.push({ label: 'New author', value: [nm, em].filter(Boolean).join(' — ').slice(0, 200) })
+      }
+      break
+    }
+    case 'MODEL_UPDATE': {
+      if (o) {
+        const mid = o.modelid ?? o.modelId
+        if (mid != null && str(mid)) lines.push({ label: 'Model ID', value: str(mid) })
+        if (str(o.name)) lines.push({ label: 'Model name', value: str(o.name) })
+        if (str(o.description)) lines.push({ label: 'Description', value: str(o.description).slice(0, 400) })
+        if (str(o.filename)) lines.push({ label: 'Filename', value: str(o.filename) })
+      }
+      break
+    }
+    case 'MODEL_DELETE': {
+      if (o?.modelId != null && str(o.modelId)) lines.push({ label: 'Model ID', value: str(o.modelId) })
+      break
+    }
+    case 'OBJECT_DELETE': {
+      if (o?.objId != null && str(o.objId)) lines.push({ label: 'Object ID', value: str(o.objId) })
+      break
+    }
+    case 'OBJECT_UPDATE': {
+      if (o?.objectId != null && str(o.objectId)) lines.push({ label: 'Object ID', value: str(o.objectId) })
+      if (o?.modelId != null && str(o.modelId)) lines.push({ label: 'Model ID', value: str(o.modelId) })
+      if (str(o.description)) lines.push({ label: 'Description', value: str(o.description).slice(0, 200) })
+      if (o?.longitude != null && o?.latitude != null) {
+        lines.push({ label: 'Position (lat, lon)', value: `${str(o.latitude)}, ${str(o.longitude)}` })
+      }
+      break
+    }
+    case 'OBJECTS_ADD': {
+      if (arr?.length) {
+        lines.push({ label: 'Objects count', value: String(arr.length) })
+        const first = arr[0]
+        if (first && typeof first === 'object') {
+          const f = /** @type {Record<string, unknown>} */ (first)
+          if (str(f.description)) lines.push({ label: 'First object description', value: str(f.description).slice(0, 120) })
+          if (f.modelId != null && str(f.modelId)) lines.push({ label: 'First object model ID', value: str(f.modelId) })
+          if (f.latitude != null && f.longitude != null) {
+            lines.push({ label: 'First object position (lat, lon)', value: `${str(f.latitude)}, ${str(f.longitude)}` })
+          }
+        }
+        if (arr.length > 1) {
+          lines.push({ label: 'Note', value: `${arr.length - 1} further object(s) in this request` })
+        }
+      }
+      break
+    }
+    default:
+      break
+  }
+
+  if (lines.length === 0) {
+    lines.push({ label: 'Details', value: 'No structured summary recorded for this request.' })
+  }
+  return lines
+}
+
 /** @type {Map<string, Handlebars.TemplateDelegate>} */
 const compiled = new Map()
 
@@ -111,6 +213,12 @@ function renderBody(eventType, data) {
   if (eventType === 'position_request.accepted') {
     ctx = enrichAcceptedPayload(ctx)
   }
+  if (eventType === 'position_request.created') {
+    ctx = {
+      ...ctx,
+      summaryLines: summarizePositionRequestCreatedLines(ctx),
+    }
+  }
   const htmlTpl = compileTemplate(`${eventType}.html`)
   const textTpl = compileTemplate(`${eventType}.txt`)
   return {
@@ -121,8 +229,15 @@ function renderBody(eventType, data) {
 
 /** One email listing multiple queue items (same event type + recipient group). */
 function renderDigestBody(eventType, items) {
-  const rows =
-    eventType === 'position_request.accepted' ? items.map((row) => enrichAcceptedPayload(row)) : items
+  let rows = items
+  if (eventType === 'position_request.accepted') {
+    rows = items.map((row) => enrichAcceptedPayload(row))
+  } else if (eventType === 'position_request.created') {
+    rows = items.map((row) => ({
+      ...row,
+      summaryLines: summarizePositionRequestCreatedLines(row),
+    }))
+  }
   const ctx = withTemplateUrls({ items: rows, count: rows.length })
   const htmlTpl = compileTemplate(`${eventType}.digest.html`)
   const textTpl = compileTemplate(`${eventType}.digest.txt`)
@@ -426,6 +541,7 @@ export {
   getApiBaseUrl,
   withTemplateUrls,
   enrichAcceptedPayload,
+  summarizePositionRequestCreatedLines,
   renderBody,
   renderDigestBody,
   renderSubject,

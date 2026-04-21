@@ -6,8 +6,17 @@
   <table style="border-collapse: collapse;">
     <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Request ID</strong></td><td>{{requestId}}</td></tr>
     <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Type</strong></td><td>{{requestType}}</td></tr>
-    <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Signature</strong></td><td><code>{{sig}}</code></td></tr>
   </table>
+  {{#if summaryLines}}
+  <div style="margin-top: 1rem;">
+    <p style="margin: 0 0 0.35rem 0; font-weight: 600;">Request summary</p>
+    <ul style="margin: 0; padding-left: 1.25rem;">
+      {{#each summaryLines}}
+      <li style="margin-bottom: 0.2rem;"><strong>{{label}}:</strong> {{value}}</li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if}}
   {{#if positionRequestsUrl}}
   <p style="margin-top: 1.25rem; font-size: 0.9rem; color: #444;">
     <a href="{{positionRequestsUrl}}" style="color: #1d4ed8;">Open the position requests page</a> to review the queue.

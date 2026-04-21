@@ -7,7 +7,11 @@ The following {{count}} item(s) are waiting for review in the FlightGear scenemo
 Row {{row}}
 Request ID: {{requestId}}
 Type:       {{requestType}}
-Signature:  {{sig}}
+{{#if summaryLines}}
+{{#each summaryLines}}
+  {{label}}: {{value}}
+{{/each}}
+{{/if}}
 {{/each}}
 
 {{#if positionRequestsUrl}}

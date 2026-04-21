@@ -1,5 +1,6 @@
 import { EmailEventType } from '../config/emailEventTypes.js'
 import * as emailQueueRepo from '../repositories/emailQueueRepository.js'
+import * as requestRepo from '../repositories/requestRepository.js'
 
 function logEnqueueError(eventType: string, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err)
@@ -19,11 +20,19 @@ export async function enqueuePositionRequestCreated(params: {
   requestId: number
   sig: string
   requestType: string
+  /** Raw request content (used to build a safe overview for reviewer emails). */
+  content?: unknown
+  comment?: string
 }): Promise<void> {
+  const overview =
+    params.content !== undefined ? requestRepo.getRequestContentOverview(params.requestType, params.content) : undefined
+  const commentTrimmed = params.comment != null ? String(params.comment).trim() : ''
   await safeEnqueue(EmailEventType.POSITION_REQUEST_CREATED, {
     requestId: params.requestId,
     sig: params.sig,
     requestType: params.requestType,
+    ...(overview != null ? { contentOverview: overview } : {}),
+    ...(commentTrimmed !== '' ? { comment: commentTrimmed } : {}),
   })
 }
 

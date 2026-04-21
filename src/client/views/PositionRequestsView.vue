@@ -57,7 +57,7 @@
                 <h4 class="details-heading">Request details</h4>
                 <template v-if="data.type === 'MODEL_ADD' && data.details?.model">
                   <ModelDetailsCard
-                    :model="modelAddDetailsModel(data.details)"
+                    :model="modelAddDetailsModel(data.details, data.authorId, data.authorName)"
                     :author-override="data.details.author || null"
                     :request-sig="data.sig"
                     compact
@@ -214,16 +214,35 @@ function formatDetails(details: unknown) {
   }
 }
 
-function modelAddDetailsModel(details: { model?: Record<string, unknown>; author?: Record<string, unknown> }): ModelDetailsModel {
+function modelAddDetailsModel(
+  details: { model?: Record<string, unknown>; author?: Record<string, unknown> },
+  rowAuthorId?: number | null,
+  rowAuthorName?: string | null,
+): ModelDetailsModel {
   const m = details.model || {}
   const author = m.author
+  const rowId = rowAuthorId != null && Number.isFinite(Number(rowAuthorId)) ? Number(rowAuthorId) : null
+  const rowName = rowAuthorName != null ? String(rowAuthorName).trim() : ''
+
+  let resolvedAuthor: ModelDetailsModel['author']
+  if (typeof author === 'number' && rowId != null && author === rowId) {
+    resolvedAuthor = { id: author, name: rowName || undefined }
+  } else if (typeof author === 'number') {
+    resolvedAuthor = author
+  } else if (author && typeof author === 'object' && typeof (author as { id?: number }).id === 'number') {
+    resolvedAuthor = {
+      id: (author as { id: number }).id,
+      name: (author as { name?: string }).name,
+    }
+  } else {
+    resolvedAuthor = undefined
+  }
+
   return {
     name: typeof m.name === 'string' ? m.name : undefined,
     filename: typeof m.filename === 'string' ? m.filename : undefined,
     description: typeof m.description === 'string' ? m.description : undefined,
-    author: typeof author === 'number' ? author : (author && typeof author === 'object' && typeof (author as { id?: number }).id === 'number'
-      ? { id: (author as { id: number }).id, name: (author as { name?: string }).name }
-      : undefined),
+    author: resolvedAuthor,
   }
 }
 

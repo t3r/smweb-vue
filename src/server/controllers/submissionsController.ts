@@ -54,6 +54,8 @@ export async function submitObjectDelete(req: Request, res: Response): Promise<v
       requestId: id,
       sig,
       requestType: requestRepo.REQUEST_TYPES.OBJECT_DELETE,
+      content,
+      comment,
     })
     res.status(201).json({ id, sig, message: 'Delete request queued for review' })
   } catch (err) {
@@ -123,6 +125,8 @@ export async function submitObjectUpdate(req: Request, res: Response): Promise<v
       requestId: id,
       sig,
       requestType: requestRepo.REQUEST_TYPES.OBJECT_UPDATE,
+      content,
+      comment,
     })
     res.status(201).json({ id, sig, message: 'Update request queued for review' })
   } catch (err) {
@@ -170,6 +174,8 @@ export async function submitModelDelete(req: Request, res: Response): Promise<vo
       requestId: id,
       sig,
       requestType: requestRepo.REQUEST_TYPES.MODEL_DELETE,
+      content,
+      comment,
     })
     res.status(201).json({ id, sig, message: 'Delete request queued for review' })
   } catch (err) {
@@ -296,6 +302,8 @@ export async function submitObjects(req: Request, res: Response): Promise<void> 
       requestId: id,
       sig,
       requestType: requestRepo.REQUEST_TYPES.OBJECTS_ADD,
+      content,
+      comment: body.comment.trim(),
     })
     res.status(201).json({ id, sig, message: 'Queued for review' })
   } catch (err) {
@@ -447,6 +455,8 @@ export async function submitModel(req: Request, res: Response): Promise<void> {
       requestId: id,
       sig,
       requestType: requestRepo.REQUEST_TYPES.MODEL_ADD,
+      content,
+      comment: ((body.comment as string) || '').trim(),
     })
     res.status(201).json({ id, sig, message: 'Queued for review' })
   } catch (err) {
@@ -679,6 +689,8 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
       requestId: id,
       sig,
       requestType: requestRepo.REQUEST_TYPES.MODEL_ADD,
+      content,
+      comment: String(body.comment || '').trim(),
     })
     res.status(201).json({ id, sig, message: 'Queued for review' })
   } catch (err) {
@@ -986,6 +998,8 @@ export async function submitModelUpdateUpload(req: Request, res: Response): Prom
       requestId: id,
       sig,
       requestType: requestRepo.REQUEST_TYPES.MODEL_UPDATE,
+      content,
+      comment: String(body.comment || '').trim(),
     })
     res.status(201).json({ id, sig, message: 'Model update queued for review' })
   } catch (err) {

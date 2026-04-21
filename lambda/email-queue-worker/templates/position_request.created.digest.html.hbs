@@ -3,13 +3,13 @@
 <body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
   <h2>New position requests ({{count}})</h2>
   <p>The following {{count}} item(s) are waiting for review in the FlightGear scenemodels queue.</p>
-  <table style="border-collapse: collapse; width: 100%; max-width: 48rem; margin-top: 1rem;">
+  <table style="border-collapse: collapse; width: 100%; max-width: 52rem; margin-top: 1rem;">
     <thead>
       <tr style="text-align: left; border-bottom: 2px solid #ccc;">
         <th style="padding: 0.5rem 0.75rem 0.5rem 0;">#</th>
         <th style="padding: 0.5rem 0.75rem;">Request ID</th>
         <th style="padding: 0.5rem 0.75rem;">Type</th>
-        <th style="padding: 0.5rem 0;">Signature</th>
+        <th style="padding: 0.5rem 0;">Summary</th>
       </tr>
     </thead>
     <tbody>
@@ -18,7 +18,17 @@
         <td style="padding: 0.5rem 0.75rem 0.5rem 0;">{{row}}</td>
         <td style="padding: 0.5rem 0.75rem;">{{requestId}}</td>
         <td style="padding: 0.5rem 0.75rem;">{{requestType}}</td>
-        <td style="padding: 0.5rem 0;"><code style="font-size: 0.85rem;">{{sig}}</code></td>
+        <td style="padding: 0.5rem 0; font-size: 0.9rem;">
+          {{#if summaryLines}}
+          <ul style="margin: 0; padding-left: 1.1rem;">
+            {{#each summaryLines}}
+            <li style="margin-bottom: 0.15rem;"><strong>{{label}}:</strong> {{value}}</li>
+            {{/each}}
+          </ul>
+          {{else}}
+          <span style="color: #666;">—</span>
+          {{/if}}
+        </td>
       </tr>
       {{/each}}
     </tbody>

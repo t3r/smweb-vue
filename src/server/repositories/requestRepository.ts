@@ -15,6 +15,11 @@ export const REQUEST_TYPES = {
 
 const MODEL_FILE_KEYS = ['thumbnail', 'modelfiles', 'modelfile']
 
+/** Safe overview for emails / API (no large base64 blobs). */
+export function getRequestContentOverview(type: string, content: unknown): unknown {
+  return contentOverview(type, content)
+}
+
 function contentOverview(type: string, content: unknown): unknown {
   if (content == null || typeof content !== 'object') return null
   switch (type) {
@@ -166,7 +171,7 @@ export async function getPendingRequests(): Promise<{ ok: PendingItem[]; failed:
     try {
       const decoded = decodeRow(row)
       if (decoded.email) emails.push(decoded.email)
-      const details = contentOverview(decoded.type, decoded.content)
+      const details = getRequestContentOverview(decoded.type, decoded.content)
       ok.push({
         id: row.spr_id,
         sig: row.spr_hash,

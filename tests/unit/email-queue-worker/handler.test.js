@@ -17,6 +17,7 @@ import {
   getApiBaseUrl,
   withTemplateUrls,
   enrichAcceptedPayload,
+  summarizePositionRequestCreatedLines,
   renderBody,
   renderDigestBody,
   renderSubject,
@@ -269,16 +270,34 @@ describe('email-queue-worker handler', () => {
     })
   })
 
+  describe('summarizePositionRequestCreatedLines', () => {
+    it('summarizes MODEL_ADD with name and description', () => {
+      const lines = summarizePositionRequestCreatedLines({
+        requestType: 'MODEL_ADD',
+        comment: 'Please review',
+        contentOverview: {
+          model: { name: 'Hangar A', description: 'Low-poly hangar', filename: 'hangar.ac' },
+          object: { latitude: 52.1, longitude: 13.2 },
+        },
+      })
+      expect(lines.some((l) => l.label === 'Submitter comment' && l.value === 'Please review')).toBe(true)
+      expect(lines.some((l) => l.label === 'Model name' && l.value === 'Hangar A')).toBe(true)
+      expect(lines.some((l) => l.label === 'Description' && l.value.includes('Low-poly'))).toBe(true)
+    })
+  })
+
   describe('renderBody (templates on disk)', () => {
     it('renders created mail with reviewer link and thank you', () => {
       vi.stubEnv('API_BASE_URL', 'https://catalog.example')
       const { html, text } = renderBody('position_request.created', {
         requestId: 42,
         requestType: 'OBJECTS_ADD',
-        sig: 'sig-1',
+        contentOverview: [{ modelId: 3, latitude: 1, longitude: 2, description: 'x' }],
+        comment: 'c',
       })
       expect(html).toContain('https://catalog.example/position-requests')
       expect(html).toContain('Thank you for contributing to the FlightGear scenery community!')
+      expect(html).toContain('Objects count')
       expect(text).toContain('Open the position requests page: https://catalog.example/position-requests')
       expect(text).toContain('Thank you for contributing')
     })

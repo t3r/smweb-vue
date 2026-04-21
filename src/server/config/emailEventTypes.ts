@@ -24,6 +24,9 @@ export interface PositionRequestCreatedPayload {
   requestId: number
   sig: string
   requestType: string
+  /** Same shape as pending-request `details` (no large base64 fields). */
+  contentOverview?: unknown
+  comment?: string
 }
 
 /** Payload for {@link EmailEventType.POSITION_REQUEST_ACCEPTED} */

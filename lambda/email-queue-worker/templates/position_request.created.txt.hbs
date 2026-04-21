@@ -2,7 +2,13 @@ New position request
 
 Request ID: {{requestId}}
 Type:       {{requestType}}
-Signature:  {{sig}}
+
+{{#if summaryLines}}
+Request summary:
+{{#each summaryLines}}
+- {{label}}: {{value}}
+{{/each}}
+{{/if}}
 
 A new item is waiting for review in the FlightGear scenemodels queue.
 
