@@ -31,10 +31,11 @@ export interface PositionRequestCreatedPayload {
 
 /** Payload for {@link EmailEventType.POSITION_REQUEST_ACCEPTED} */
 export interface PositionRequestAcceptedPayload {
-  sig: string
   requestType: string
   submitterEmail: string
   comment: string
+  /** Same shape as pending-request `details` (no large base64 fields). */
+  contentOverview?: unknown
   reviewerAuthorId?: number
   /** Outcome of executeRequest (modelId, objectId, objectIds, …); mailer builds catalogue links for MODEL_ADD / OBJECTS_ADD */
   executeResult?: unknown
@@ -42,9 +43,9 @@ export interface PositionRequestAcceptedPayload {
 
 /** Payload for {@link EmailEventType.POSITION_REQUEST_REJECTED} */
 export interface PositionRequestRejectedPayload {
-  sig: string
   requestType: string
   submitterEmail: string
   comment: string
   reason: string
+  contentOverview?: unknown
 }

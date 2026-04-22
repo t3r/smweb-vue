@@ -5,12 +5,16 @@
   <p>The following FlightGear scenemodels position request(s) were <strong>not</strong> accepted.</p>
   {{#each items}}
   <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
-    <p style="margin: 0 0 0.5rem 0;"><strong>#{{row}}</strong> — {{requestType}} — <code>{{sig}}</code></p>
+    <p style="margin: 0 0 0.5rem 0;"><strong>#{{row}}</strong> — {{requestType}}</p>
     {{#if reason}}
     <p style="margin: 0.25rem 0;"><strong>Reason</strong><br/>{{reason}}</p>
     {{/if}}
-    {{#if comment}}
-    <p style="margin: 0.25rem 0;"><strong>Your comment</strong><br/>{{comment}}</p>
+    {{#if summaryLines}}
+    <ul style="margin: 0.35rem 0 0 0; padding-left: 1.25rem;">
+      {{#each summaryLines}}
+      <li style="margin-bottom: 0.2rem;"><strong>{{label}}:</strong> {{value}}</li>
+      {{/each}}
+    </ul>
     {{/if}}
   </div>
   {{/each}}

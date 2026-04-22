@@ -5,11 +5,17 @@
   <p>Your FlightGear scenemodels position request has been <strong>accepted</strong> and applied.</p>
   <table style="border-collapse: collapse;">
     <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Type</strong></td><td>{{requestType}}</td></tr>
-    <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Reference</strong></td><td><code>{{sig}}</code></td></tr>
-    {{#if comment}}
-    <tr><td style="padding: 0.25rem 1rem 0.25rem 0; vertical-align: top;"><strong>Your comment</strong></td><td>{{comment}}</td></tr>
-    {{/if}}
   </table>
+  {{#if summaryLines}}
+  <div style="margin-top: 1rem;">
+    <p style="margin: 0 0 0.35rem 0; font-weight: 600;">Request summary</p>
+    <ul style="margin: 0; padding-left: 1.25rem;">
+      {{#each summaryLines}}
+      <li style="margin-bottom: 0.2rem;"><strong>{{label}}:</strong> {{value}}</li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if}}
   {{#if hasDetailLinks}}
   <p style="margin-top: 1rem;"><strong>View in the catalogue</strong></p>
   <ul style="margin: 0.25rem 0 0 1rem; padding: 0;">
@@ -17,10 +23,6 @@
     <li style="margin: 0.35rem 0;"><a href="{{href}}" style="color: #1d4ed8;">{{label}}</a></li>
     {{/each}}
   </ul>
-  {{/if}}
-  {{#if executeResult}}
-  <p style="margin-top: 1rem;"><strong>Result</strong></p>
-  <pre style="background: #f4f4f5; padding: 0.75rem; overflow: auto; font-size: 0.85rem;">{{json executeResult}}</pre>
   {{/if}}
   <p style="margin-top: 1.5rem; font-size: 0.95rem; color: #374151;">Thank you for contributing to the FlightGear scenery community!</p>
 </body>

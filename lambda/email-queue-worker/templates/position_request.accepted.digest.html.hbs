@@ -5,9 +5,13 @@
   <p>Your FlightGear scenemodels position request(s) below have been <strong>accepted</strong> and applied.</p>
   {{#each items}}
   <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
-    <p style="margin: 0 0 0.5rem 0;"><strong>#{{row}}</strong> — {{requestType}} — <code>{{sig}}</code></p>
-    {{#if comment}}
-    <p style="margin: 0.25rem 0;"><strong>Your comment</strong><br/>{{comment}}</p>
+    <p style="margin: 0 0 0.5rem 0;"><strong>#{{row}}</strong> — {{requestType}}</p>
+    {{#if summaryLines}}
+    <ul style="margin: 0.35rem 0 0 0; padding-left: 1.25rem;">
+      {{#each summaryLines}}
+      <li style="margin-bottom: 0.2rem;"><strong>{{label}}:</strong> {{value}}</li>
+      {{/each}}
+    </ul>
     {{/if}}
     {{#if hasDetailLinks}}
     <p style="margin: 0.75rem 0 0 0;"><strong>View in the catalogue</strong></p>
@@ -16,10 +20,6 @@
       <li style="margin: 0.35rem 0;"><a href="{{href}}" style="color: #1d4ed8;">{{label}}</a></li>
       {{/each}}
     </ul>
-    {{/if}}
-    {{#if executeResult}}
-    <p style="margin: 0.5rem 0 0 0;"><strong>Result</strong></p>
-    <pre style="background: #f4f4f5; padding: 0.75rem; overflow: auto; font-size: 0.85rem;">{{json executeResult}}</pre>
     {{/if}}
   </div>
   {{/each}}

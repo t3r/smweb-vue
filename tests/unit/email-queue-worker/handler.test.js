@@ -153,12 +153,12 @@ describe('email-queue-worker handler', () => {
     it('merges payload and row index', () => {
       const m = msg({
         eqId: 7,
-        payload: { sig: 'abc', requestType: 'X' },
+        payload: { note: 'abc', requestType: 'X' },
       })
       const row = buildItemRow(m, 3)
       expect(row.row).toBe(3)
       expect(row.eqId).toBe(7)
-      expect(row.sig).toBe('abc')
+      expect(row.note).toBe('abc')
       expect(row.requestType).toBe('X')
     })
   })
@@ -306,15 +306,22 @@ describe('email-queue-worker handler', () => {
       vi.stubEnv('API_BASE_URL', 'https://catalog.example')
       const { html, text } = renderBody('position_request.accepted', {
         requestType: 'MODEL_ADD',
-        sig: 's',
         submitterEmail: 'u@x.com',
-        comment: '',
+        comment: 'Thanks',
+        contentOverview: {
+          model: { name: 'Hangar A', description: 'Low-poly hangar.' },
+        },
         executeResult: { modelId: 5, objectId: 6 },
       })
       expect(html).toContain('https://catalog.example/models/5')
       expect(html).toContain('https://catalog.example/objects/6')
       expect(html).toContain('View in the catalogue')
+      expect(html).toContain('Model name')
+      expect(html).toContain('Hangar A')
+      expect(html).toContain('Submitter comment')
+      expect(html).not.toContain('<code>')
       expect(text).toContain('https://catalog.example/models/5')
+      expect(text).toContain('Hangar A')
     })
   })
 
@@ -326,9 +333,10 @@ describe('email-queue-worker handler', () => {
             eqId: 1,
             payload: {
               requestType: 'OBJECT_UPDATE',
-              sig: 'a',
               submitterEmail: 'u@x.com',
               reason: 'no',
+              comment: 'Please fix',
+              contentOverview: { objectId: 9, description: 'Tower' },
             },
           }),
           1
@@ -338,9 +346,9 @@ describe('email-queue-worker handler', () => {
             eqId: 2,
             payload: {
               requestType: 'OBJECT_UPDATE',
-              sig: 'b',
               submitterEmail: 'u@x.com',
               reason: 'nope',
+              contentOverview: { objectId: 10, description: 'Sign' },
             },
           }),
           2
@@ -349,6 +357,8 @@ describe('email-queue-worker handler', () => {
       const { html, text } = renderDigestBody('position_request.rejected', items)
       expect(html).toContain('Position requests rejected (2)')
       expect(html).toContain('#1')
+      expect(html).toContain('Object ID')
+      expect(html).not.toContain('<code>')
       expect(text).toContain('Thank you for contributing')
     })
 
@@ -359,7 +369,6 @@ describe('email-queue-worker handler', () => {
           msg({
             payload: {
               requestType: 'OBJECTS_ADD',
-              sig: 'x',
               submitterEmail: 'u@x.com',
               executeResult: { objectIds: [1, 2] },
             },

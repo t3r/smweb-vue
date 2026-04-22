@@ -2,22 +2,18 @@ Request accepted
 
 Your FlightGear scenemodels position request has been accepted and applied.
 
-Type:       {{requestType}}
-Reference:  {{sig}}
-{{#if comment}}
-Your comment:
-{{comment}}
+Type: {{requestType}}
+{{#if summaryLines}}
+Request summary:
+{{#each summaryLines}}
+- {{label}}: {{value}}
+{{/each}}
 {{/if}}
 {{#if hasDetailLinks}}
 View in the catalogue:
 {{#each detailLinks}}
 - {{label}}: {{href}}
 {{/each}}
-{{/if}}
-{{#if executeResult}}
-
-Result:
-{{json executeResult}}
 {{/if}}
 
 Thank you for contributing to the FlightGear scenery community!

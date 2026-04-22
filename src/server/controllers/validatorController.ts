@@ -152,10 +152,10 @@ export async function accept(req: Request, res: Response): Promise<void> {
       /* keep raw */
     }
     await enqueuePositionRequestAccepted({
-      sig: request.sig,
       requestType: request.type,
       submitterEmail: request.email || '',
       comment: request.comment || '',
+      content: request.content ?? null,
       reviewerAuthorId:
         reviewerAuthorId != null && Number.isInteger(reviewerAuthorId) ? reviewerAuthorId : undefined,
       executeResult,
@@ -183,11 +183,11 @@ export async function reject(req: Request, res: Response): Promise<void> {
       console.log('[position-request] Rejected', { sig, reason })
     }
     await enqueuePositionRequestRejected({
-      sig: request.sig,
       requestType: request.type,
       submitterEmail: request.email || '',
       comment: request.comment || '',
       reason,
+      content: request.content ?? null,
     })
     await requestRepo.deleteRequest(sig!)
     res.json({ success: true, message: 'Request rejected and removed' })

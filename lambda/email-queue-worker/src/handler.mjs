@@ -210,10 +210,19 @@ function compileTemplate(name) {
 
 function renderBody(eventType, data) {
   let ctx = withTemplateUrls(data)
-  if (eventType === 'position_request.accepted') {
-    ctx = enrichAcceptedPayload(ctx)
-  }
   if (eventType === 'position_request.created') {
+    ctx = {
+      ...ctx,
+      summaryLines: summarizePositionRequestCreatedLines(ctx),
+    }
+  }
+  if (eventType === 'position_request.accepted') {
+    ctx = enrichAcceptedPayload({
+      ...ctx,
+      summaryLines: summarizePositionRequestCreatedLines(ctx),
+    })
+  }
+  if (eventType === 'position_request.rejected') {
     ctx = {
       ...ctx,
       summaryLines: summarizePositionRequestCreatedLines(ctx),
@@ -231,7 +240,17 @@ function renderBody(eventType, data) {
 function renderDigestBody(eventType, items) {
   let rows = items
   if (eventType === 'position_request.accepted') {
-    rows = items.map((row) => enrichAcceptedPayload(row))
+    rows = items.map((row) =>
+      enrichAcceptedPayload({
+        ...row,
+        summaryLines: summarizePositionRequestCreatedLines(row),
+      })
+    )
+  } else if (eventType === 'position_request.rejected') {
+    rows = items.map((row) => ({
+      ...row,
+      summaryLines: summarizePositionRequestCreatedLines(row),
+    }))
   } else if (eventType === 'position_request.created') {
     rows = items.map((row) => ({
       ...row,

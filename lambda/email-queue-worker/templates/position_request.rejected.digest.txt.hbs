@@ -5,14 +5,14 @@ The following FlightGear scenemodels position request(s) were not accepted.
 {{#each items}}
 ---
 #{{row}}
-Type:      {{requestType}}
-Reference: {{sig}}
+Type: {{requestType}}
 {{#if reason}}
-Reason:    {{reason}}
+Reason: {{reason}}
 {{/if}}
-{{#if comment}}
-Your comment:
-{{comment}}
+{{#if summaryLines}}
+{{#each summaryLines}}
+- {{label}}: {{value}}
+{{/each}}
 {{/if}}
 {{/each}}
 

@@ -2,14 +2,15 @@ Request rejected
 
 Your FlightGear scenemodels position request was not accepted.
 
-Type:       {{requestType}}
-Reference:  {{sig}}
+Type: {{requestType}}
 {{#if reason}}
-Reason:     {{reason}}
+Reason: {{reason}}
 {{/if}}
-{{#if comment}}
-Your comment:
-{{comment}}
+{{#if summaryLines}}
+Request summary:
+{{#each summaryLines}}
+- {{label}}: {{value}}
+{{/each}}
 {{/if}}
 
 Thank you for contributing to the FlightGear scenery community!

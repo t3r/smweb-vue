@@ -37,35 +37,44 @@ export async function enqueuePositionRequestCreated(params: {
 }
 
 export async function enqueuePositionRequestAccepted(params: {
-  sig: string
   requestType: string
   submitterEmail: string
   comment: string
+  /** Raw request content (safe overview for submitter email). */
+  content?: unknown
   reviewerAuthorId?: number
   executeResult?: unknown
 }): Promise<void> {
+  const overview =
+    params.content !== undefined
+      ? requestRepo.getRequestContentOverview(params.requestType, params.content)
+      : undefined
   await safeEnqueue(EmailEventType.POSITION_REQUEST_ACCEPTED, {
-    sig: params.sig,
     requestType: params.requestType,
     submitterEmail: params.submitterEmail,
     comment: params.comment,
+    ...(overview != null ? { contentOverview: overview } : {}),
     ...(params.reviewerAuthorId != null ? { reviewerAuthorId: params.reviewerAuthorId } : {}),
     ...(params.executeResult !== undefined ? { executeResult: params.executeResult } : {}),
   })
 }
 
 export async function enqueuePositionRequestRejected(params: {
-  sig: string
   requestType: string
   submitterEmail: string
   comment: string
   reason: string
+  content?: unknown
 }): Promise<void> {
+  const overview =
+    params.content !== undefined
+      ? requestRepo.getRequestContentOverview(params.requestType, params.content)
+      : undefined
   await safeEnqueue(EmailEventType.POSITION_REQUEST_REJECTED, {
-    sig: params.sig,
     requestType: params.requestType,
     submitterEmail: params.submitterEmail,
     comment: params.comment,
     reason: params.reason,
+    ...(overview != null ? { contentOverview: overview } : {}),
   })
 }

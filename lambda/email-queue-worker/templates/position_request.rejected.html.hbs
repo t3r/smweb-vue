@@ -5,14 +5,20 @@
   <p>Your FlightGear scenemodels position request was <strong>not</strong> accepted.</p>
   <table style="border-collapse: collapse;">
     <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Type</strong></td><td>{{requestType}}</td></tr>
-    <tr><td style="padding: 0.25rem 1rem 0.25rem 0;"><strong>Reference</strong></td><td><code>{{sig}}</code></td></tr>
     {{#if reason}}
     <tr><td style="padding: 0.25rem 1rem 0.25rem 0; vertical-align: top;"><strong>Reason</strong></td><td>{{reason}}</td></tr>
     {{/if}}
-    {{#if comment}}
-    <tr><td style="padding: 0.25rem 1rem 0.25rem 0; vertical-align: top;"><strong>Your comment</strong></td><td>{{comment}}</td></tr>
-    {{/if}}
   </table>
+  {{#if summaryLines}}
+  <div style="margin-top: 1rem;">
+    <p style="margin: 0 0 0.35rem 0; font-weight: 600;">Request summary</p>
+    <ul style="margin: 0; padding-left: 1.25rem;">
+      {{#each summaryLines}}
+      <li style="margin-bottom: 0.2rem;"><strong>{{label}}:</strong> {{value}}</li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if}}
   <p style="margin-top: 1.5rem; font-size: 0.95rem; color: #374151;">Thank you for contributing to the FlightGear scenery community!</p>
 </body>
 </html>
