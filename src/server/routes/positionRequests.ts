@@ -5,6 +5,12 @@ import { requireAuth, requireRole } from '../middleware/auth.js'
 const router = express.Router()
 
 router.get('/', requireAuth, requireRole('reviewer'), positionRequestsController.getList)
+router.get(
+  '/pending-count',
+  requireAuth,
+  requireRole('reviewer'),
+  positionRequestsController.getPendingCount
+)
 router.get('/:sig/model-preview', requireAuth, requireRole('reviewer'), positionRequestsController.getModelPreview)
 router.get('/:sig/model-files', requireAuth, requireRole('reviewer'), positionRequestsController.getRequestModelFiles)
 router.get('/:sig/file', requireAuth, requireRole('reviewer'), positionRequestsController.getRequestModelFile)

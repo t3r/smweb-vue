@@ -57,6 +57,16 @@ function mimeForModelFileBasename(name: string): string {
   return mime[ext.toLowerCase()] || 'application/octet-stream'
 }
 
+export async function getPendingCount(_req: Request, res: Response): Promise<void> {
+  try {
+    const count = await requestRepo.countPendingRequests()
+    res.json({ count })
+  } catch (err) {
+    logDbError(err, 'GET /api/position-requests/pending-count')
+    res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
+  }
+}
+
 export async function getList(req: Request, res: Response): Promise<void> {
   try {
     const { ok, failed } = await requestRepo.getPendingRequests()

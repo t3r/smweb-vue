@@ -172,6 +172,7 @@ vi.mock('../../src/server/repositories/requestRepository.ts', () => ({
   saveRequest: vi.fn().mockResolvedValue({ id: 1, sig: 'mock-sig' }),
   getRequestBySig: vi.fn().mockResolvedValue(null),
   getPendingRequests: vi.fn().mockResolvedValue({ ok: [], failed: [] }),
+  countPendingRequests: vi.fn().mockResolvedValue(0),
   getPendingEntityIds: vi.fn().mockResolvedValue({ objectIds: [], modelIds: [] }),
   deleteRequest: vi.fn().mockResolvedValue(undefined),
   /** Used by enqueuePositionRequestCreated for reviewer email payload (tests ignore result). */

@@ -1,6 +1,17 @@
 <template>
   <div class="layout-root">
     <Menubar :model="navItems">
+      <template #item="{ item, props, hasSubmenu }">
+        <a v-bind="props.action" href="#" @click.prevent>
+          <span v-bind="props.label">{{ item.label }}</span>
+          <span
+            v-if="item.key === 'pending-requests' && pendingRequestCount > 0"
+            class="pending-count-pill"
+            aria-hidden="true"
+          >{{ pendingRequestCount }}</span>
+          <span v-if="hasSubmenu" v-bind="props.submenuicon" class="pi pi-angle-down menubar-submenu-chevron" />
+        </a>
+      </template>
       <template #start>
         <router-link to="/" class="logo-link">
           <img src="/FlightGear_logo.svg" alt="" class="navbar-logo" width="32" height="32" />
@@ -48,14 +59,59 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ThemePicker from './ThemePicker.vue'
 import { useAuthStore } from '@/stores/auth'
 
+const PENDING_COUNT_POLL_MS = 15 * 60 * 1000
+
 const router = useRouter()
 const auth = useAuthStore()
 const loginMenuRef = ref(null)
+const pendingRequestCount = ref(0)
+
+let pendingCountPollTimer: ReturnType<typeof setInterval> | null = null
+
+async function fetchPendingRequestCount(): Promise<void> {
+  if (!auth.isReviewer) return
+  try {
+    const res = await fetch('/api/position-requests/pending-count', { credentials: 'same-origin' })
+    if (!res.ok) return
+    const data = (await res.json()) as { count?: unknown }
+    const n = data.count
+    pendingRequestCount.value = typeof n === 'number' && Number.isFinite(n) ? n : 0
+  } catch {
+    /* ignore network errors for badge */
+  }
+}
+
+function stopPendingCountPolling(): void {
+  if (pendingCountPollTimer != null) {
+    clearInterval(pendingCountPollTimer)
+    pendingCountPollTimer = null
+  }
+}
+
+function startPendingCountPolling(): void {
+  stopPendingCountPolling()
+  void fetchPendingRequestCount()
+  pendingCountPollTimer = setInterval(() => void fetchPendingRequestCount(), PENDING_COUNT_POLL_MS)
+}
+
+watch(
+  () => auth.loaded && auth.isReviewer,
+  (active) => {
+    if (active) startPendingCountPolling()
+    else {
+      stopPendingCountPolling()
+      pendingRequestCount.value = 0
+    }
+  },
+  { immediate: true }
+)
+
+onUnmounted(stopPendingCountPolling)
 
 const gitSlug = typeof __FGS_GIT_SLUG__ !== 'undefined' ? __FGS_GIT_SLUG__ : 'dev'
 const repoWebUrl =
@@ -80,7 +136,11 @@ const navItems = computed(() => {
     { label: 'About', command: () => router.push('/about') },
   ]
   if (auth.isReviewer) {
-    items.push({ label: 'Pending requests', command: () => router.push('/position-requests') })
+    items.push({
+      key: 'pending-requests',
+      label: 'Pending requests',
+      command: () => router.push('/position-requests'),
+    })
   }
   return items
 })
@@ -144,6 +204,22 @@ main {
 }
 .user-name-link:hover {
   text-decoration: underline;
+}
+.pending-count-pill {
+  display: inline-block;
+  min-width: 1.25rem;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.25;
+  vertical-align: middle;
+  background: var(--p-primary-color);
+  color: var(--p-primary-contrast-color, #fff);
+}
+.menubar-submenu-chevron {
+  margin-left: 0.35rem;
 }
 .site-footer {
   flex-shrink: 0;
