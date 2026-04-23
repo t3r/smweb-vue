@@ -217,11 +217,13 @@
                         option-label="label"
                         option-value="value"
                         placeholder="Select author"
+                        filter
+                        filter-placeholder="Search name"
                         class="w-full"
                         @change="onAuthorChange"
                       />
                     </div>
-                    <div v-if="form.authorId === '1'" class="field">
+                    <div v-if="form.authorId === OTHER_AUTHOR_OPTION_VALUE" class="field">
                       <label for="add-model-author-name" class="field-label">Your name <span class="required">*</span></label>
                       <InputText
                         id="add-model-author-name"
@@ -244,7 +246,7 @@
                     </div>
                     <div v-else class="field field--spacer" aria-hidden="true" />
                   </div>
-                  <div v-if="form.authorId === '1'" class="field-pair mt-field">
+                  <div v-if="form.authorId === OTHER_AUTHOR_OPTION_VALUE" class="field-pair mt-field">
                     <div class="field">
                       <label for="add-model-author-email" class="field-label">Your email <span class="required">*</span></label>
                       <InputText
@@ -337,6 +339,9 @@ import { useErrorDialog } from '@/composables/useErrorDialog'
 import { useAppToast } from '@/composables/useAppToast'
 import { useAuthStore } from '@/stores/auth'
 
+/** UI-only value for “Other (not listed)”; server still expects numeric authorId `1` for that path. Must not collide with a real catalogue author id. */
+const OTHER_AUTHOR_OPTION_VALUE = '__other__'
+
 const route = useRoute()
 const auth = useAuthStore()
 const { toastSuccess } = useAppToast()
@@ -357,7 +362,7 @@ const form = ref({
   groupId: null as string | null,
   name: '',
   description: '',
-  authorId: '1',
+  authorId: OTHER_AUTHOR_OPTION_VALUE,
   authorName: '',
   authorEmail: '',
   contactEmail: '',
@@ -374,7 +379,7 @@ const xmlFile = ref<File | null>(null)
 const pngFiles = ref<File[]>([])
 
 const modelGroups = ref<{ id: number; name: string | null; path: string | null }[]>([])
-const authors = ref<{ id: number; name: string | null }[]>([])
+const authors = ref<{ id: number; name: string | null; email?: string | null }[]>([])
 
 const packageFilesLoaded = ref(false)
 const existingXmlName = ref<string | null>(null)
@@ -406,11 +411,16 @@ const groupOptions = computed(() =>
 )
 
 const authorOptions = computed(() => {
-  const list = (authors.value || []).map((a) => ({
+  const sorted = [...(authors.value || [])].sort((a, b) => {
+    const na = (a.name || `Author #${a.id}`).toLowerCase()
+    const nb = (b.name || `Author #${b.id}`).toLowerCase()
+    return na.localeCompare(nb, undefined, { sensitivity: 'base' })
+  })
+  const list = sorted.map((a) => ({
     label: a.name || `Author #${a.id}`,
     value: String(a.id),
   }))
-  const other = { label: 'Other (not listed)', value: '1' }
+  const other = { label: 'Other (not listed)', value: OTHER_AUTHOR_OPTION_VALUE }
   return [...list, other]
 })
 
@@ -455,7 +465,7 @@ const canSubmit = computed(() => {
   const hasContactEmail =
     auth.isAuthenticated && auth.user?.email ? true : (form.value.contactEmail?.trim().length ?? 0) > 0
   if (!form.value.gplAccepted || !hasContactEmail) return false
-  if (form.value.authorId !== '1') {
+  if (form.value.authorId !== OTHER_AUTHOR_OPTION_VALUE) {
     return form.value.authorId != null
   }
   return (
@@ -481,13 +491,39 @@ function onPngChange(e: Event) {
   pngFiles.value = input.files ? Array.from(input.files) : []
 }
 function onAuthorChange() {
-  if (form.value.authorId !== '1') {
+  if (form.value.authorId !== OTHER_AUTHOR_OPTION_VALUE) {
     form.value.authorName = ''
     form.value.authorEmail = ''
   }
 }
 
-function applyLoggedInUserToAuthorStep() {
+function findCatalogAuthorForSessionUser(): { id: number; name: string | null } | null {
+  const u = auth.user
+  if (!u) return null
+  const uid = Number(u.id)
+  if (Number.isInteger(uid) && uid >= 1) {
+    const byId = authors.value.find((a) => Number(a.id) === uid)
+    if (byId) return byId
+  }
+  const email = (u.email || '').trim().toLowerCase()
+  if (email) {
+    const byEmail = authors.value.find((a) => {
+      const ae = a.email
+      return ae != null && String(ae).trim().toLowerCase() === email
+    })
+    if (byEmail) return byEmail
+  }
+  const uname = (u.name || '').trim().toLowerCase()
+  if (uname) {
+    return (
+      authors.value.find((a) => (a.name || '').trim().toLowerCase() === uname) ?? null
+    )
+  }
+  return null
+}
+
+/** Fill contact fields from session (does not change author dropdown). */
+function applyLoggedInUserContactFields() {
   const u = auth.user
   if (!u) return
   if (u.name) form.value.authorName = u.name
@@ -495,20 +531,20 @@ function applyLoggedInUserToAuthorStep() {
     form.value.authorEmail = u.email
     form.value.contactEmail = u.email
   }
-  const matchById = authors.value.find((a) => a.id === u.id)
-  const matchByName =
-    (u.name &&
-      authors.value.find((a) => (a.name || '').trim().toLowerCase() === (u.name || '').trim().toLowerCase())) ??
-    null
-  const match = matchById ?? matchByName
+}
+
+/** On “Add model”, pick the catalogue row for the logged-in user when present. */
+function applyLoggedInAuthorSelectionForNewModel() {
+  if (isEditMode.value) return
+  const match = findCatalogAuthorForSessionUser()
   if (match) form.value.authorId = String(match.id)
 }
 
 async function loadOptions() {
   try {
     const [groupsRes, authorsRes] = await Promise.all([
-      fetch(auth.apiUrl('/api/modelgroups')),
-      fetch(auth.apiUrl('/api/authors?limit=5000')),
+      fetch(auth.apiUrl('/api/modelgroups'), { credentials: 'include' }),
+      fetch(auth.apiUrl('/api/authors?limit=5000&sortField=name&sortOrder=1'), { credentials: 'include' }),
     ])
     if (groupsRes.ok) {
       const d = await groupsRes.json()
@@ -524,7 +560,8 @@ async function loadOptions() {
       const d = await authorsRes.json()
       authors.value = d.authors ?? []
     }
-    if (!isEditMode.value) applyLoggedInUserToAuthorStep()
+    applyLoggedInUserContactFields()
+    applyLoggedInAuthorSelectionForNewModel()
   } catch (err) {
     console.error('Failed to load options', err)
   }
@@ -568,7 +605,7 @@ async function loadModelForEdit() {
     existingPngEntries.value = files.filter((f) => f.name.toLowerCase().endsWith('.png'))
     packageFilesLoaded.value = true
 
-    applyLoggedInUserToAuthorStep()
+    applyLoggedInUserContactFields()
   } catch (e) {
     showError(e instanceof Error ? e.message : 'Failed to load model')
   }
@@ -592,8 +629,10 @@ async function submit() {
     }
     fd.append('comment', form.value.comment.trim())
     fd.append('gplAccepted', form.value.gplAccepted ? 'true' : 'false')
-    fd.append('authorId', form.value.authorId ?? '1')
-    if (form.value.authorId === '1') {
+    const authorIdForApi =
+      form.value.authorId === OTHER_AUTHOR_OPTION_VALUE ? '1' : (form.value.authorId ?? '1')
+    fd.append('authorId', authorIdForApi)
+    if (form.value.authorId === OTHER_AUTHOR_OPTION_VALUE) {
       fd.append('authorName', form.value.authorName.trim())
       fd.append('authorEmail', form.value.authorEmail.trim())
     }

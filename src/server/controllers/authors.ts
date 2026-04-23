@@ -17,7 +17,7 @@ export async function getAuthors(req: Request, res: Response): Promise<void> {
     const descriptionVal = validateDescriptionSearch(description)
     const data = await authorService.getAuthors(
       validateOffset(offset),
-      validateLimit(limit),
+      validateLimit(limit, 5000),
       currentAuthorId,
       sortFieldVal,
       sortOrderVal,
