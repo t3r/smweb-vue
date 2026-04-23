@@ -30,7 +30,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
     "express-session": "^1.19.0",
-    "fast-xml-parser": "^5.6.0",
+    "fast-xml-parser": "^5.7.0",
     "helmet": "^8.1.0",
     "joi": "^18.1.2",
     "maplibre-gl": "^5.23.0",
