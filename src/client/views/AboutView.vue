@@ -1,6 +1,18 @@
 <template>
   <div class="about-view">
     <h1 class="mt-0">About</h1>
+    <p>
+      For decades, our PHP-based scenery platform has been a trusted cornerstone of the FlightGear community — reliably serving thousands of 3D object placements and worldwide position data to simmers across the globe. <br />
+      Now we've rebuilt it from the ground up. The new platform is based on a modern Vue 3 + Node.js + PostgreSQL architecture, is fully open source, and available on <a href="https://github.com/t3r/smweb-vue">GitHub</a>.
+    </p>
+    <p>The codebase is backed by hundreds of automated tests and a continuous build and deployment pipeline, so contributions are easier, improvements and fixes reach you faster.<br />
+      Dependencies are kept up to date automatically via Dependabot, keeping the platform secure and maintainable long into the future. <br />
+      Contributing to the dataset has never been easier. A streamlined workflow lets community members submit and manage 3D scenery objects and their geographic positions with less friction, while a cleaner review process helps maintainers evaluate and approve contributions efficiently. <br />
+      Role-based access control ensures that contributors, reviewers, and administrators each have clearly defined permissions — keeping collaboration both open and well-organized.
+    </p>
+    <p>Same trusted data. Modern tools. <br />
+      Built by the community, for the community.
+    </p>
 
     <p class="text-color-secondary lead">
       <a href="https://www.flightgear.org/" target="_blank">FlightGear</a> is a free, open-source flight simulator built by volunteers around the world. Its world is not bought in a box: it is stitched together from
