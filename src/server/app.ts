@@ -17,6 +17,7 @@ import { perIpLimiter, perSessionLimiter } from './middleware/rateLimit.js'
 import { CLIENT_ERROR_MESSAGE } from './utils/dbFallback.js'
 import { getClientBuildId } from './utils/clientBuildId.js'
 import { startOurAirportsSyncScheduler } from './services/ourAirportsSync.js'
+import { apiDocsBasicAuth } from './middleware/apiDocsBasicAuth.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -92,7 +93,12 @@ app.use(passport.session())
 app.use(perIpLimiter)
 app.use(perSessionLimiter)
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+/** Common scanner path; never serve the SPA here. */
+app.all('/app.php', (_req, res) => {
+  res.status(404).json({ error: 'Not found' })
+})
+
+app.use('/api-docs', apiDocsBasicAuth, swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -147,7 +153,7 @@ if (isProduction) {
         return
       }
       const p = req.path || ''
-      if (p.startsWith('/api') || p.startsWith('/api-docs')) {
+      if (p.startsWith('/api') || p.startsWith('/api-docs') || p === '/app.php') {
         next()
         return
       }

@@ -1,4 +1,5 @@
 import session from 'express-session'
+import type { RequestHandler } from 'express'
 import type { Store } from 'express-session'
 import pg from 'pg'
 import connectPgSimple from 'connect-pg-simple'
@@ -76,4 +77,4 @@ const sessionConfig: Parameters<typeof session>[0] = {
   ...(sessionStore ? { store: sessionStore } : {}),
 }
 
-export const sessionMiddleware = session(sessionConfig)
+export const sessionMiddleware: RequestHandler = session(sessionConfig)
