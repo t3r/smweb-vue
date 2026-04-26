@@ -1,21 +1,30 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
+import { ROUTES_META, type AppRouteName } from './routesMeta'
 
-const routes = [
-  { path: '/', name: 'Home', component: () => import('@/views/HomeView.vue'), meta: { title: 'Home' } },
-  { path: '/news', name: 'News', component: () => import('@/views/NewsView.vue'), meta: { title: 'News' } },
-  { path: '/about', name: 'About', component: () => import('@/views/AboutView.vue'), meta: { title: 'About' } },
-  { path: '/models', name: 'Models', component: () => import('@/views/ModelsView.vue'), meta: { title: 'Models' } },
-  { path: '/models/add', name: 'AddModel', component: () => import('@/views/AddModelView.vue'), meta: { title: 'Add model' } },
-  { path: '/models/:id/edit', name: 'EditModel', component: () => import('@/views/AddModelView.vue'), meta: { title: 'Update model' } },
-  { path: '/models/:id', name: 'ModelDetail', component: () => import('@/views/ModelDetailView.vue'), meta: { title: 'Model' } },
-  { path: '/map', name: 'Map', component: () => import('@/views/MapView.vue'), meta: { title: 'Map' } },
-  { path: '/objects', name: 'Objects', component: () => import('@/views/ObjectsView.vue'), meta: { title: 'Objects' } },
-  { path: '/objects/import', name: 'ObjectMassImport', component: () => import('@/views/ObjectMassImportView.vue'), meta: { title: 'Mass import objects' } },
-  { path: '/objects/:id', name: 'ObjectDetail', component: () => import('@/views/ObjectDetailView.vue'), meta: { title: 'Object' } },
-  { path: '/authors', name: 'Authors', component: () => import('@/views/AuthorsView.vue'), meta: { title: 'Authors' } },
-  { path: '/authors/:id', name: 'AuthorDetail', component: () => import('@/views/AuthorDetailView.vue'), meta: { title: 'Author' } },
-  { path: '/position-requests', name: 'PositionRequests', component: () => import('@/views/PositionRequestsView.vue'), meta: { title: 'Position requests' } },
-]
+const routeComponents: Record<AppRouteName, () => Promise<RouteRecordRaw['component']>> = {
+  Home: () => import('@/views/HomeView.vue'),
+  News: () => import('@/views/NewsView.vue'),
+  About: () => import('@/views/AboutView.vue'),
+  Models: () => import('@/views/ModelsView.vue'),
+  AddModel: () => import('@/views/AddModelView.vue'),
+  EditModel: () => import('@/views/AddModelView.vue'),
+  ModelDetail: () => import('@/views/ModelDetailView.vue'),
+  Map: () => import('@/views/MapView.vue'),
+  Objects: () => import('@/views/ObjectsView.vue'),
+  ObjectMassImport: () => import('@/views/ObjectMassImportView.vue'),
+  ObjectDetail: () => import('@/views/ObjectDetailView.vue'),
+  Authors: () => import('@/views/AuthorsView.vue'),
+  AuthorDetail: () => import('@/views/AuthorDetailView.vue'),
+  PositionRequests: () => import('@/views/PositionRequestsView.vue'),
+}
+
+const routes: RouteRecordRaw[] = ROUTES_META.map((m) => ({
+  path: m.path,
+  name: m.name,
+  component: routeComponents[m.name],
+  meta: { title: m.title },
+}))
 
 const router = createRouter({
   history: createWebHistory(),

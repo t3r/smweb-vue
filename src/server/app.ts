@@ -117,6 +117,11 @@ app.get('/api/client-build', (_req, res) => {
 app.use('/api', apiRoutes)
 app.use('/api/auth', authRoutes)
 
+/** Any remaining path under `/api` was not handled by a router (unknown API route). */
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Not found' })
+})
+
 /** Vite `outDir`: dist/public (sibling of dist/server). */
 function getClientDistPath(): string | null {
   const override = process.env.CLIENT_DIST_PATH?.trim()
@@ -135,8 +140,14 @@ if (isProduction) {
         immutable: false,
       })
     )
+    /** Hosts that serve the built SPA from this process (typical behind a reverse proxy). */
     app.use((req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') {
+        next()
+        return
+      }
+      const p = req.path || ''
+      if (p.startsWith('/api') || p.startsWith('/api-docs')) {
         next()
         return
       }
@@ -152,6 +163,11 @@ if (isProduction) {
     )
   }
 }
+
+/** Unmatched routes (e.g. POST to a non-existent path, or no SPA bundle in production). */
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Not found' })
+})
 
 const isMainModule = process.argv[1]?.endsWith('app.js') || process.argv[1]?.endsWith('app.ts')
 if (isMainModule) {
