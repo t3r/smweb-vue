@@ -72,12 +72,51 @@
               <span v-if="roleSaveStatus" class="role-save-status ml-2">{{ roleSaveStatus }}</span>
             </span>
           </template>
-          <span class="detail-label">Models</span>
-          <span>
-            <router-link v-if="author.modelsCount != null" :to="modelsByAuthorLink">{{ author.modelsCount }} model(s)</router-link>
-            <span v-else>—</span>
-          </span>
         </div>
+      </Panel>
+
+      <Panel class="mb-3">
+        <template #header>
+          <div class="recent-models-panel-header flex flex-wrap align-items-baseline gap-2">
+            <span class="recent-models-head-title">Recent models</span>
+            <template v-if="author.modelsCount != null">
+              <span class="text-color-secondary">-</span>
+              <router-link :to="modelsByAuthorLink" class="recent-models-show-all">
+                show all {{ author.modelsCount }}
+                {{ author.modelsCount === 1 ? 'model' : 'models' }}
+              </router-link>
+            </template>
+          </div>
+        </template>
+        <p v-if="recentModelsLoading" class="m-0">Loading…</p>
+        <p v-else-if="recentModelsError" class="m-0 text-color-secondary">{{ recentModelsError }}</p>
+        <p v-else-if="!recentModels.length" class="m-0 text-color-secondary">No models for this author yet.</p>
+        <ul v-else class="recent-models-list list-none p-0 m-0">
+          <li
+            v-for="m in recentModels"
+            :key="m.id"
+            class="recent-model-row flex gap-3 py-3 border-bottom-1 surface-border align-items-start"
+          >
+            <router-link :to="`/models/${m.id}`" class="recent-model-thumb-link flex-shrink-0">
+              <img
+                :src="modelThumbnailUrl(m.id)"
+                :alt="modelDisplayName(m)"
+                class="recent-model-thumb"
+                @error="onModelThumbError"
+              />
+            </router-link>
+            <div class="recent-model-body min-w-0 flex-1">
+              <div class="recent-model-desc text-break">
+                {{ modelDescriptionLine(m) }}
+              </div>
+              <div class="recent-model-meta text-color-secondary text-sm mt-1">
+                <span>{{ formatModelDate(m.lastUpdated) }}</span>
+                <span class="mx-2">·</span>
+                <router-link :to="objectsForModelLink(m.id)">Objects</router-link>
+              </div>
+            </div>
+          </li>
+        </ul>
       </Panel>
     </template>
 
@@ -106,6 +145,18 @@ const roleSaveStatus = ref('')
 const descriptionDraft = ref('')
 const descriptionSaving = ref(false)
 const descriptionSaveStatus = ref('')
+
+interface RecentModelRow {
+  id: number
+  name?: string | null
+  filename?: string | null
+  description?: string | null
+  lastUpdated?: string | null
+}
+
+const recentModels = ref<RecentModelRow[]>([])
+const recentModelsLoading = ref(false)
+const recentModelsError = ref('')
 
 const isAdmin = computed(() => auth.isAdmin)
 
@@ -139,6 +190,66 @@ const modelsByAuthorLink = computed(() => {
   const id = author.value?.id
   return id != null ? `/models?author=${id}` : '/models'
 })
+
+function modelThumbnailUrl(modelId: number) {
+  return auth.apiUrl(`/api/models/${modelId}/thumbnail`)
+}
+
+function objectsForModelLink(modelId: number) {
+  return { path: '/objects', query: { model: String(modelId) } }
+}
+
+function modelDisplayName(m: RecentModelRow) {
+  return (m.name && String(m.name).trim()) || (m.filename && String(m.filename).trim()) || `Model #${m.id}`
+}
+
+function modelDescriptionLine(m: RecentModelRow) {
+  const raw = m.description != null ? String(m.description).trim() : ''
+  if (raw) return stripHtmlTags(raw).trim() || raw
+  return modelDisplayName(m)
+}
+
+function formatModelDate(iso: unknown) {
+  if (!iso) return '—'
+  try {
+    const d = new Date(String(iso))
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  } catch {
+    return String(iso)
+  }
+}
+
+function onModelThumbError(e: Event) {
+  const t = e.target as HTMLImageElement
+  if (t) t.style.display = 'none'
+}
+
+async function fetchRecentModels(authorId: number) {
+  if (!Number.isFinite(authorId) || authorId < 1) {
+    recentModels.value = []
+    return
+  }
+  recentModelsLoading.value = true
+  recentModelsError.value = ''
+  try {
+    const params = new URLSearchParams({
+      author: String(authorId),
+      offset: '0',
+      limit: '10',
+      sortField: 'lastUpdated',
+      sortOrder: '-1',
+    })
+    const res = await fetch(auth.apiUrl(`/api/models?${params}`), { credentials: 'include' })
+    if (!res.ok) throw new Error(res.statusText)
+    const data = (await res.json()) as { models?: RecentModelRow[] }
+    recentModels.value = Array.isArray(data.models) ? data.models : []
+  } catch {
+    recentModels.value = []
+    recentModelsError.value = 'Could not load recent models.'
+  } finally {
+    recentModelsLoading.value = false
+  }
+}
 
 function formatLastLogin(isoString) {
   if (!isoString) return '—'
@@ -222,6 +333,8 @@ async function fetchAuthor() {
   loading.value = true
   clearError()
   author.value = null
+  recentModels.value = []
+  recentModelsError.value = ''
   selectedRole.value = null
   roleSaveStatus.value = ''
   descriptionSaveStatus.value = ''
@@ -242,6 +355,7 @@ async function fetchAuthor() {
     } else {
       descriptionDraft.value = ''
     }
+    void fetchRecentModels(Number(data.id))
   } catch (err) {
     showError((err as Error).message || 'Failed to load author')
   } finally {
@@ -324,4 +438,38 @@ watch(() => route.params.id, () => void fetchAuthor())
 .flex-wrap { flex-wrap: wrap; }
 .gap-1 { gap: 0.25rem; }
 .gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.flex { display: flex; }
+.flex-1 { flex: 1 1 0; }
+.flex-shrink-0 { flex-shrink: 0; }
+.align-items-start { align-items: flex-start; }
+.min-w-0 { min-width: 0; }
+.text-break { word-break: break-word; overflow-wrap: anywhere; }
+.text-sm { font-size: 0.875rem; }
+.mt-1 { margin-top: 0.25rem; }
+.mx-2 { margin-left: 0.5rem; margin-right: 0.5rem; }
+.border-bottom-1 { border-bottom: 1px solid var(--p-content-border-color, #e2e8f0); }
+.surface-border { border-color: var(--p-content-border-color, #e2e8f0); }
+.recent-models-list li:last-child {
+  border-bottom: none;
+}
+.recent-model-thumb {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+.recent-model-thumb-link {
+  line-height: 0;
+}
+.recent-models-head-title {
+  font-weight: 600;
+}
+.align-items-baseline {
+  align-items: baseline;
+}
+.recent-models-show-all {
+  font-weight: 500;
+}
 </style>
