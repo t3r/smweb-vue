@@ -1,6 +1,9 @@
 import crypto from 'node:crypto'
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import passport from '../config/passport.js'
+import { requireAuth } from '../middleware/auth.js'
+import * as accountMergeService from '../services/accountMergeService.js'
+import { AccountMergeError } from '../services/accountMergeService.js'
 
 const router = Router()
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173'
@@ -99,6 +102,11 @@ function requireGitLabConfig(req: Request, res: Response, next: NextFunction): v
   else redirectToFrontend(req, res, '?auth_error=config')
 }
 
+function requireGoogleConfig(req: Request, res: Response, next: NextFunction): void {
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) next()
+  else redirectToFrontend(req, res, '?auth_error=config')
+}
+
 router.get('/github', requireGitHubConfig, (req, res, next) => {
   const rt = sanitizeReturnTo(req.query.returnTo)
   const state = encodeOAuthReturnState(rt)
@@ -124,6 +132,42 @@ router.get(
       req.login(user, (loginErr?: Error) => {
         if (loginErr) {
           console.error('[auth/github] Session login error:', loginErr?.message || loginErr)
+          const msg = sanitizeErrorMessage(loginErr)
+          redirectToFrontend(req, res, loginErrorParams('session_error', msg || 'Session could not be saved.'))
+          return
+        }
+        const returnPath = decodeOAuthReturnState(req.query.state) ?? ''
+        redirectToFrontend(req, res, returnPath)
+      })
+    })(req, res, next)
+  }
+)
+
+router.get('/google', requireGoogleConfig, (req, res, next) => {
+  const rt = sanitizeReturnTo(req.query.returnTo)
+  const state = encodeOAuthReturnState(rt)
+  passport.authenticate('google', { scope: ['profile', 'email'], state })(req, res, next)
+})
+
+router.get(
+  '/google/callback',
+  requireGoogleConfig,
+  (req, res, next) => {
+    passport.authenticate('google', (err: Error | null, user?: Express.User, info?: { message?: string }) => {
+      if (err) {
+        console.error('[auth/google] Strategy error:', err?.message || err)
+        const msg = sanitizeErrorMessage(err)
+        redirectToFrontend(req, res, loginErrorParams('strategy_error', msg || 'Google authentication failed.'))
+        return
+      }
+      if (!user) {
+        console.error('[auth/google] No user returned (info):', info?.message || info)
+        redirectToFrontend(req, res, loginErrorParams('no_user', (info?.message as string) || 'No user from Google.'))
+        return
+      }
+      req.login(user, (loginErr?: Error) => {
+        if (loginErr) {
+          console.error('[auth/google] Session login error:', loginErr?.message || loginErr)
           const msg = sanitizeErrorMessage(loginErr)
           redirectToFrontend(req, res, loginErrorParams('session_error', msg || 'Session could not be saved.'))
           return
@@ -170,6 +214,85 @@ router.get(
     })(req, res, next)
   }
 )
+
+function mergeError(res: Response, err: unknown): void {
+  if (err instanceof AccountMergeError) {
+    res.status(err.statusCode).json({ error: err.message })
+    return
+  }
+  const msg = err instanceof Error ? err.message : String(err)
+  console.error('[auth/merge]', msg)
+  res.status(500).json({ error: 'Could not complete merge operation' })
+}
+
+router.post('/merge/initiate', requireAuth, (req: Request, res: Response) => {
+  const uid = req.user?.id
+  if (uid == null) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
+  void (async () => {
+    try {
+      const out = await accountMergeService.initiateMerge(Number(uid), req.body ?? {})
+      res.json(out)
+    } catch (err) {
+      mergeError(res, err)
+    }
+  })()
+})
+
+router.get('/merge/preview', requireAuth, (req: Request, res: Response) => {
+  const uid = req.user?.id
+  if (uid == null) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
+  const token = typeof req.query.token === 'string' ? req.query.token : ''
+  const id = typeof req.query.id === 'string' ? req.query.id : ''
+  void (async () => {
+    try {
+      const data = await accountMergeService.previewMerge(Number(uid), token, id)
+      res.json(data)
+    } catch (err) {
+      mergeError(res, err)
+    }
+  })()
+})
+
+router.post('/merge/confirm', requireAuth, (req: Request, res: Response) => {
+  const uid = req.user?.id
+  if (uid == null) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
+  const token = typeof req.body?.token === 'string' ? req.body.token : ''
+  const id = typeof req.body?.id === 'string' ? req.body.id : ''
+  void (async () => {
+    try {
+      const out = await accountMergeService.confirmMerge(Number(uid), token, id, req)
+      res.json(out)
+    } catch (err) {
+      mergeError(res, err)
+    }
+  })()
+})
+
+router.post('/merge/cancel', requireAuth, (req: Request, res: Response) => {
+  const uid = req.user?.id
+  if (uid == null) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
+  const id = typeof req.body?.id === 'string' ? req.body.id : ''
+  void (async () => {
+    try {
+      await accountMergeService.cancelMerge(Number(uid), id)
+      res.json({ ok: true })
+    } catch (err) {
+      mergeError(res, err)
+    }
+  })()
+})
 
 router.post('/logout', (req, res, next) => {
   req.logout((err) => {

@@ -147,6 +147,7 @@ const navItems = computed(() => {
 
 const loginMenuItems = computed(() => [
   { label: 'GitHub', icon: 'pi pi-github', command: () => auth.loginWithGitHub() },
+  { label: 'Google', icon: 'pi pi-google', command: () => auth.loginWithGoogle() },
   { label: 'GitLab', icon: 'pi pi-code', command: () => auth.loginWithGitLab() },
 ])
 

@@ -1,15 +1,20 @@
 import passport from 'passport'
 import GitHubStrategy from 'passport-github2'
 import GitLabStrategy from 'passport-gitlab2'
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
+import type { Profile as GoogleProfile } from 'passport-google-oauth20'
 import {
   findOrCreateUser,
   getSessionUserByAuthorId,
   AUTH_PROVIDER_GITHUB,
+  AUTH_PROVIDER_GOOGLE,
   AUTH_PROVIDER_GITLAB,
 } from '../services/authService.js'
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
 const GITLAB_CLIENT_ID = process.env.GITLAB_CLIENT_ID
 const GITLAB_CLIENT_SECRET = process.env.GITLAB_CLIENT_SECRET
 const GITLAB_BASE_URL = process.env.GITLAB_BASE_URL || 'https://gitlab.com'
@@ -42,6 +47,40 @@ if (GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET) {
           done(null, user)
         } catch (err) {
           console.error('[passport/github] findOrCreateUser error:', (err as Error)?.message || err)
+          if ((err as Error)?.stack) console.error((err as Error).stack)
+          done(err as Error)
+        }
+      }
+    )
+  )
+}
+
+if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: GOOGLE_CLIENT_ID,
+        clientSecret: GOOGLE_CLIENT_SECRET,
+        callbackURL: buildCallbackUrl('google'),
+        scope: ['profile', 'email'],
+      },
+      async (
+        _accessToken: string,
+        _refreshToken: string,
+        profile: GoogleProfile,
+        done: (err: Error | null, user?: Express.User) => void
+      ) => {
+        try {
+          const externalId = String(profile.id)
+          const displayName =
+            profile.displayName ||
+            [profile.name?.givenName, profile.name?.familyName].filter(Boolean).join(' ').trim() ||
+            ''
+          const email = profile.emails?.[0]?.value || profile._json?.email || ''
+          const user = await findOrCreateUser(AUTH_PROVIDER_GOOGLE, externalId, displayName, email)
+          done(null, user)
+        } catch (err) {
+          console.error('[passport/google] findOrCreateUser error:', (err as Error)?.message || err)
           if ((err as Error)?.stack) console.error((err as Error).stack)
           done(err as Error)
         }

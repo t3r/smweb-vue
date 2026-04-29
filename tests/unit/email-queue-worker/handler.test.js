@@ -261,6 +261,15 @@ describe('email-queue-worker handler', () => {
     it('throws if submitter missing', () => {
       expect(() => resolveRecipients('position_request.accepted', {})).toThrow(/submitterEmail/)
     })
+
+    it('returns recipientEmail for account_merge.confirm', () => {
+      const r = resolveRecipients('account_merge.confirm', { recipientEmail: ' owner@target.org ' })
+      expect(r.to).toEqual(['owner@target.org'])
+    })
+
+    it('throws if recipientEmail missing for account_merge.confirm', () => {
+      expect(() => resolveRecipients('account_merge.confirm', {})).toThrow(/recipientEmail/)
+    })
   })
 
   describe('renderSubject', () => {
@@ -287,6 +296,22 @@ describe('email-queue-worker handler', () => {
   })
 
   describe('renderBody (templates on disk)', () => {
+    it('renders account_merge.confirm with link', () => {
+      vi.stubEnv('API_BASE_URL', 'https://catalog.example')
+      const { html, text } = renderBody('account_merge.confirm', {
+        recipientEmail: 't@y.org',
+        link: 'https://catalog.example/merge/confirm?token=a&id=b',
+        sourceName: 'Alice',
+        targetName: 'Bob',
+        sourceAuthorId: 10,
+        targetAuthorId: 20,
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      })
+      expect(html).toContain('https://catalog.example/merge/confirm')
+      expect(html).toContain('Alice')
+      expect(text).toContain('merge/confirm')
+    })
+
     it('renders created mail with reviewer link and thank you', () => {
       vi.stubEnv('API_BASE_URL', 'https://catalog.example')
       const { html, text } = renderBody('position_request.created', {

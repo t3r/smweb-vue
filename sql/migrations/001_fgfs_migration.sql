@@ -1,6 +1,6 @@
 -- User roles for authorization (normal user, reviewer, admin).
 -- Run this migration to enable role-based access.
--- eu_authority in fgs_extuserids: 1 = GitHub, 5 = GitLab (2–4 reserved in legacy schema).
+-- eu_authority in fgs_extuserids: 1 = GitHub, 2 = Google, 5 = GitLab (3–4 reserved in legacy schema).
 
 CREATE TABLE IF NOT EXISTS public.fgs_user_roles (
     au_id integer NOT NULL PRIMARY KEY REFERENCES public.fgs_authors(au_id) ON DELETE CASCADE,

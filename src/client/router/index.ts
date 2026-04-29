@@ -16,6 +16,8 @@ const routeComponents: Record<AppRouteName, () => Promise<RouteRecordRaw['compon
   ObjectDetail: () => import('@/views/ObjectDetailView.vue'),
   Authors: () => import('@/views/AuthorsView.vue'),
   AuthorDetail: () => import('@/views/AuthorDetailView.vue'),
+  MergeConfirm: () => import('@/views/MergeConfirmView.vue'),
+  MergeAccount: () => import('@/views/MergeAccountView.vue'),
   PositionRequests: () => import('@/views/PositionRequestsView.vue'),
 }
 

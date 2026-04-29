@@ -2,7 +2,7 @@
   <div>
     <h1 class="mt-0">FlightGear Scenery Repository</h1>
     <h2>Temporarily limited write access</h2>
-    <p>During an initial phase, this site restricts contributions to users authenticate through gitlab or github. <br />
+    <p>During an initial phase, this site restricts contributions to users who authenticate through GitHub, Google, or GitLab. <br />
     We want to make sure everything works as expected before opening all service for public access. </br >
     Feel free to look around.
     </p>

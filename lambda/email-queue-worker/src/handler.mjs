@@ -210,6 +210,9 @@ function compileTemplate(name) {
 
 function renderBody(eventType, data) {
   let ctx = withTemplateUrls(data)
+  if (eventType === 'account_merge.confirm') {
+    ctx = { ...ctx }
+  }
   if (eventType === 'position_request.created') {
     ctx = {
       ...ctx,
@@ -281,6 +284,7 @@ const SUBJECT_TEMPLATES = {
   'position_request.created': '[FG Scenemodels] New position request #{{requestId}} ({{requestType}})',
   'position_request.accepted': '[FG Scenemodels] Your request was accepted ({{requestType}})',
   'position_request.rejected': '[FG Scenemodels] Your request was rejected ({{requestType}})',
+  'account_merge.confirm': '[FG Scenemodels] Verify account merge ({{sourceName}} → {{targetName}})',
 }
 
 const DIGEST_EVENT_TYPES = new Set(Object.keys(SUBJECT_DIGEST_TEMPLATES))
@@ -371,6 +375,14 @@ function resolveRecipients(eventType, payload) {
       throw new Error('NOTIFY_REVIEWER_EMAILS must be set for position_request.created')
     }
     return { to: reviewers }
+  }
+
+  if (eventType === 'account_merge.confirm') {
+    const to = typeof payload.recipientEmail === 'string' ? payload.recipientEmail.trim() : ''
+    if (!to) {
+      throw new Error('recipientEmail missing in payload')
+    }
+    return { to: [to] }
   }
 
   const submitter = typeof payload.submitterEmail === 'string' ? payload.submitterEmail.trim() : ''

@@ -75,6 +75,15 @@
         </div>
       </Panel>
 
+      <Panel v-if="isOwnProfile" header="Account" class="mb-3">
+        <p class="m-0 mb-2 text-color-secondary text-sm">
+          If you have two author records (for example legacy submissions under another email), you can merge them after verifying the other account’s email.
+        </p>
+        <router-link to="/account/merge" class="merge-another-link">
+          <Button label="Merge with another account" icon="pi pi-users" outlined />
+        </router-link>
+      </Panel>
+
       <Panel class="mb-3">
         <template #header>
           <div class="recent-models-panel-header flex flex-wrap align-items-baseline gap-2">
@@ -471,5 +480,9 @@ watch(() => route.params.id, () => void fetchAuthor())
 }
 .recent-models-show-all {
   font-weight: 500;
+}
+.merge-another-link {
+  text-decoration: none;
+  display: inline-block;
 }
 </style>

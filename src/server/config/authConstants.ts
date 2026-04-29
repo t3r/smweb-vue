@@ -1,5 +1,6 @@
-/** OAuth authority codes (fgs_extuserids.eu_authority) */
+/** OAuth authority codes (fgs_extuserids.eu_authority; aligns with legacy comments: 2 = Google, 3–4 reserved) */
 export const AUTH_PROVIDER_GITHUB = 1
+export const AUTH_PROVIDER_GOOGLE = 2
 export const AUTH_PROVIDER_GITLAB = 5
 
 /** Role names for authorization */

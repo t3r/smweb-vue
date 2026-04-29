@@ -10,9 +10,10 @@
     @hide="authConfigError = false"
   >
     <p class="m-0">
-      Login is not configured. Set <code>GITHUB_CLIENT_ID</code> / <code>GITHUB_CLIENT_SECRET</code> or
-      <code>GITLAB_CLIENT_ID</code> / <code>GITLAB_CLIENT_SECRET</code> in the server <code>.env</code> (see
-      <code>.env.example</code>).
+      Login is not configured. Set at least one OAuth pair in the server <code>.env</code> (see
+      <code>.env.example</code>): <code>GITHUB_CLIENT_ID</code> / <code>GITHUB_CLIENT_SECRET</code>,
+      <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>, or
+      <code>GITLAB_CLIENT_ID</code> / <code>GITLAB_CLIENT_SECRET</code>.
     </p>
     <template #footer>
       <Button label="OK" autofocus @click="authConfigError = false" />

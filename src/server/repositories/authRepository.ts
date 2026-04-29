@@ -1,7 +1,7 @@
 import { QueryTypes } from 'sequelize'
 import { sequelize } from '../config/database.js'
 import * as authorRepo from './authorRepository.js'
-import { AUTH_PROVIDER_GITHUB, AUTH_PROVIDER_GITLAB, ROLE_USER } from '../config/authConstants.js'
+import { ROLE_USER } from '../config/authConstants.js'
 
 export async function findExternalUser(authority: number, externalId: string): Promise<{ authorId: number } | null> {
   const rows = (await sequelize.query(

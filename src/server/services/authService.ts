@@ -1,6 +1,6 @@
 import * as authRepo from '../repositories/authRepository.js'
 import Author from '../models/Author.js'
-import { AUTH_PROVIDER_GITHUB, AUTH_PROVIDER_GITLAB } from '../config/authConstants.js'
+import { AUTH_PROVIDER_GITHUB, AUTH_PROVIDER_GOOGLE, AUTH_PROVIDER_GITLAB } from '../config/authConstants.js'
 
 export interface SessionUser {
   id: number
@@ -46,4 +46,4 @@ export async function getSessionUserByAuthorId(authorId: number): Promise<Sessio
   }
 }
 
-export { AUTH_PROVIDER_GITHUB, AUTH_PROVIDER_GITLAB }
+export { AUTH_PROVIDER_GITHUB, AUTH_PROVIDER_GOOGLE, AUTH_PROVIDER_GITLAB }

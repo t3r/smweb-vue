@@ -16,6 +16,8 @@ export const ROUTES_META = [
   { path: '/objects/:id', name: 'ObjectDetail', title: 'Object' },
   { path: '/authors', name: 'Authors', title: 'Authors' },
   { path: '/authors/:id', name: 'AuthorDetail', title: 'Author' },
+  { path: '/merge/confirm', name: 'MergeConfirm', title: 'Confirm merge' },
+  { path: '/account/merge', name: 'MergeAccount', title: 'Merge account' },
   { path: '/position-requests', name: 'PositionRequests', title: 'Position requests' },
 ] as const
 

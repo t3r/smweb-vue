@@ -15,6 +15,8 @@ export const EmailEventType = {
   POSITION_REQUEST_ACCEPTED: 'position_request.accepted',
   /** Request was rejected; row is deleted after enqueue — payload is a snapshot. */
   POSITION_REQUEST_REJECTED: 'position_request.rejected',
+  /** Account merge — link sent to target author's email for verification. */
+  ACCOUNT_MERGE_CONFIRM: 'account_merge.confirm',
 } as const
 
 export type EmailEventTypeName = (typeof EmailEventType)[keyof typeof EmailEventType]
@@ -48,4 +50,15 @@ export interface PositionRequestRejectedPayload {
   comment: string
   reason: string
   contentOverview?: unknown
+}
+
+/** Payload for {@link EmailEventType.ACCOUNT_MERGE_CONFIRM} */
+export interface AccountMergeConfirmPayload {
+  recipientEmail: string
+  link: string
+  sourceName: string
+  targetName: string
+  sourceAuthorId: number
+  targetAuthorId: number
+  expiresAt: string
 }
