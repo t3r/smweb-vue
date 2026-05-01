@@ -104,6 +104,7 @@ const props = withDefaults(
 )
 
 const auth = useAuthStore()
+const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
 const currentObject = ref<FetchedObject | null>(null)
 const loading = ref(true)
 const loadError = ref<string | null>(null)
@@ -240,6 +241,7 @@ async function fetchObject() {
   }
   loading.value = true
   currentObject.value = null
+  clearError()
   try {
     const url = auth.apiUrl(`/api/objects/${id}`)
     const res = await fetch(url, { credentials: 'include' })

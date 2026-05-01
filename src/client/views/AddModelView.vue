@@ -17,6 +17,62 @@
       <Card>
         <template #content>
           <div class="add-form-shell">
+            <section
+              v-if="isEditMode && editBaseline"
+              class="form-section model-edit-changes"
+              aria-labelledby="edit-model-changes-title"
+            >
+              <h2 id="edit-model-changes-title" class="form-section-title">Changes from saved model</h2>
+              <p class="section-hint m-0 mb-2">
+                Highlighted fields differ from the catalogue, or you selected new files / removals that will apply on submit.
+              </p>
+              <div class="comparison-grid">
+                <div class="comparison-column">
+                  <h4 class="comparison-heading">Current (saved)</h4>
+                  <dl class="comparison-fields">
+                    <dt>Name</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.name }">{{ formatBaseline(editBaseline.name) }}</dd>
+                    <dt>Description</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.description }">{{ formatBaseline(editBaseline.description) }}</dd>
+                    <dt>Model family</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.group }">{{ groupLabelByIdStr(editBaseline.groupId) }}</dd>
+                    <dt>Author</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.author }">{{ editBaseline.authorDisplay }}</dd>
+                    <dt>Filename (path)</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.path }">{{ formatBaseline(editBaseline.filename) }}</dd>
+                    <dt>Thumbnail</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.thumb }">Stored image</dd>
+                    <dt>XML</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.xml }">{{ existingXmlName || 'None' }}</dd>
+                    <dt>PNG textures</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.png }">
+                      {{ existingPngEntries.length ? `${existingPngEntries.length} in package` : 'None' }}
+                    </dd>
+                  </dl>
+                </div>
+                <div class="comparison-column">
+                  <h4 class="comparison-heading">Your update</h4>
+                  <dl class="comparison-fields">
+                    <dt>Name</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.name }">{{ formatBaseline(form.name) }}</dd>
+                    <dt>Description</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.description }">{{ formatBaseline(form.description) }}</dd>
+                    <dt>Model family</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.group }">{{ groupLabelByIdStr(form.groupId) }}</dd>
+                    <dt>Author</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.author }">{{ yourAuthorDisplay }}</dd>
+                    <dt>Filename (path)</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.path }">{{ yourPathCaption }}</dd>
+                    <dt>Thumbnail</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.thumb }">{{ thumbFileName || 'No change' }}</dd>
+                    <dt>XML</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.xml }">{{ yourXmlCaption }}</dd>
+                    <dt>PNG textures</dt>
+                    <dd :class="{ 'value-modified': editFieldDiffs.png }">{{ yourPngCaption }}</dd>
+                  </dl>
+                </div>
+              </div>
+            </section>
             <div class="add-form-columns">
               <!-- Left: model + files -->
               <div class="add-form-col add-form-col--main">
@@ -388,6 +444,19 @@ const removeXmlFromPackage = ref(false)
 const removePngNames = ref<string[]>([])
 const routeBootstrapDone = ref(false)
 
+/** Snapshot after loading the model for edit — drives “changes from saved” comparison. */
+interface EditBaseline {
+  name: string
+  description: string
+  groupId: string | null
+  authorId: string
+  authorName: string
+  authorEmail: string
+  authorDisplay: string
+  filename: string
+}
+const editBaseline = ref<EditBaseline | null>(null)
+
 function toggleRemovePng(name: string, v: unknown) {
   const on = v === true
   const arr = removePngNames.value
@@ -401,6 +470,87 @@ const xmlFileName = computed(() => xmlFile.value?.name ?? null)
 const pngFileSummary = computed(() => {
   const n = pngFiles.value.length
   return n === 0 ? 'None' : n === 1 ? pngFiles.value[0].name : `${n} files`
+})
+
+function formatBaseline(s: string) {
+  const t = (s ?? '').trim()
+  return t || '—'
+}
+
+function groupLabelByIdStr(idStr: string | null): string {
+  if (idStr == null || idStr === '') return '—'
+  const id = Number(idStr)
+  if (!Number.isFinite(id)) return '—'
+  const g = modelGroups.value.find((x) => x.id === id)
+  if (!g) return `Group #${idStr}`
+  return (g.name || g.path || `Group #${id}`).trim() || `Group #${id}`
+}
+
+const yourAuthorDisplay = computed(() => {
+  if (form.value.authorId === OTHER_AUTHOR_OPTION_VALUE) {
+    const n = form.value.authorName.trim()
+    const e = form.value.authorEmail.trim()
+    if (!n && !e) return 'Other (new author)'
+    return n ? (e ? `${n} (${e})` : n) : e
+  }
+  const opt = authorOptions.value.find((o) => o.value === form.value.authorId)
+  return opt?.label ?? `Author #${form.value.authorId}`
+})
+
+const editFieldDiffs = computed(() => {
+  const b = editBaseline.value
+  if (!b) {
+    return {
+      name: false,
+      description: false,
+      group: false,
+      author: false,
+      path: false,
+      thumb: false,
+      xml: false,
+      png: false,
+    }
+  }
+  const authorChanged =
+    form.value.authorId !== b.authorId ||
+    (form.value.authorId === OTHER_AUTHOR_OPTION_VALUE &&
+      (form.value.authorName.trim() !== b.authorName || form.value.authorEmail.trim() !== b.authorEmail))
+  return {
+    name: form.value.name.trim() !== b.name,
+    description: form.value.description.trim() !== b.description,
+    group: form.value.groupId !== b.groupId,
+    author: authorChanged,
+    path: ac3dFile.value != null,
+    thumb: thumbFile.value != null,
+    xml: xmlFile.value != null || removeXmlFromPackage.value,
+    png: pngFiles.value.length > 0 || removePngNames.value.length > 0,
+  }
+})
+
+const yourPathCaption = computed(() => {
+  if (ac3dFile.value) return `New AC: ${ac3dFile.value.name}`
+  return editBaseline.value?.filename ? editBaseline.value.filename : '—'
+})
+
+const yourXmlCaption = computed(() => {
+  if (removeXmlFromPackage.value) return 'Remove XML from package'
+  if (xmlFile.value) return xmlFile.value.name
+  return 'No change'
+})
+
+const yourPngCaption = computed(() => {
+  const parts: string[] = []
+  if (pngFiles.value.length) {
+    parts.push(
+      pngFiles.value.length === 1
+        ? `Add: ${pngFiles.value[0].name}`
+        : `Add ${pngFiles.value.length} file(s)`,
+    )
+  }
+  if (removePngNames.value.length) {
+    parts.push(`Remove: ${removePngNames.value.join(', ')}`)
+  }
+  return parts.length ? parts.join(' · ') : 'No change'
 })
 
 const groupOptions = computed(() =>
@@ -573,6 +723,7 @@ async function loadModelForEdit() {
     showError('Invalid model id')
     return
   }
+  editBaseline.value = null
   clearError()
   packageFilesLoaded.value = false
   existingXmlName.value = null
@@ -588,8 +739,9 @@ async function loadModelForEdit() {
     const m = (await res.json()) as {
       name?: string | null
       description?: string | null
+      filename?: string | null
       groupId?: number
-      author?: { id?: number } | null
+      author?: { id?: number; name?: string | null } | null
     }
     form.value.name = (m.name && String(m.name).trim()) || ''
     form.value.description = (m.description && String(m.description).trim()) || ''
@@ -606,6 +758,22 @@ async function loadModelForEdit() {
     packageFilesLoaded.value = true
 
     applyLoggedInUserContactFields()
+
+    const authorDisplay =
+      m.author?.id != null && Number.isFinite(Number(m.author.id))
+        ? `${(m.author.name && String(m.author.name).trim()) || 'Author'} (#${m.author.id})`
+        : '—'
+    const fn = m.filename != null ? String(m.filename).trim() : ''
+    editBaseline.value = {
+      name: form.value.name.trim(),
+      description: form.value.description.trim(),
+      groupId: form.value.groupId,
+      authorId: form.value.authorId,
+      authorName: form.value.authorName.trim(),
+      authorEmail: form.value.authorEmail.trim(),
+      authorDisplay,
+      filename: fn || '—',
+    }
   } catch (e) {
     showError(e instanceof Error ? e.message : 'Failed to load model')
   }
@@ -718,6 +886,44 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+.model-edit-changes .comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+@media (max-width: 600px) {
+  .model-edit-changes .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.model-edit-changes .comparison-column {
+  min-width: 0;
+}
+.model-edit-changes .comparison-heading {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+}
+.model-edit-changes .comparison-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+.model-edit-changes .comparison-fields dt {
+  color: var(--p-text-muted-color);
+  font-weight: 500;
+}
+.model-edit-changes .comparison-fields dd {
+  margin: 0;
+}
+.model-edit-changes .comparison-fields dd.value-modified {
+  background: var(--p-highlight-background, rgba(59, 130, 246, 0.15));
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  margin: 0 -0.4rem;
 }
 .add-form-columns {
   display: grid;

@@ -13,7 +13,35 @@ function isPendingPkgErr(r: PendingPkgLoad): r is PendingPkgErr {
   return r.ok === false
 }
 
-async function loadPendingModelAddPackage(sig: string): Promise<PendingPkgLoad> {
+/** Gzipped tarball base64: nested under `model` for MODEL_ADD, at content root for MODEL_UPDATE. */
+function modelfilesBase64FromContent(type: string, content: Record<string, unknown>): string | undefined {
+  if (type === 'MODEL_ADD') {
+    const model = content.model as Record<string, unknown> | undefined
+    const b64 = (model?.modelfiles ?? model?.modelfile) as string | undefined
+    return typeof b64 === 'string' ? b64 : undefined
+  }
+  if (type === 'MODEL_UPDATE') {
+    const b64 = (content.modelfiles ?? content.modelfile) as string | undefined
+    return typeof b64 === 'string' ? b64 : undefined
+  }
+  return undefined
+}
+
+/** Submission JPEG base64: under `model` for MODEL_ADD, at content root for MODEL_UPDATE. */
+function thumbnailBase64FromContent(type: string, content: Record<string, unknown>): string | undefined {
+  if (type === 'MODEL_ADD') {
+    const model = content.model as Record<string, unknown> | undefined
+    const t = model?.thumbnail
+    return typeof t === 'string' ? t : undefined
+  }
+  if (type === 'MODEL_UPDATE') {
+    const t = content.thumbnail
+    return typeof t === 'string' ? t : undefined
+  }
+  return undefined
+}
+
+async function loadPendingModelPackage(sig: string): Promise<PendingPkgLoad> {
   if (!sig || typeof sig !== 'string') {
     const err: PendingPkgErr = { ok: false, status: 400, error: 'Missing sig' }
     return err
@@ -23,14 +51,18 @@ async function loadPendingModelAddPackage(sig: string): Promise<PendingPkgLoad> 
     const err: PendingPkgErr = { ok: false, status: 404, error: 'Request not found or already processed' }
     return err
   }
-  if (request.type !== 'MODEL_ADD' || !request.content || typeof request.content !== 'object') {
-    const err: PendingPkgErr = { ok: false, status: 400, error: 'Not a MODEL_ADD request or no content' }
+  const pkgTypes = new Set(['MODEL_ADD', 'MODEL_UPDATE'])
+  if (!pkgTypes.has(request.type) || !request.content || typeof request.content !== 'object') {
+    const err: PendingPkgErr = {
+      ok: false,
+      status: 400,
+      error: 'Not a MODEL_ADD/MODEL_UPDATE request or no content',
+    }
     return err
   }
   const content = request.content as Record<string, unknown>
-  const model = content.model as Record<string, unknown> | undefined
-  const modelfilesBase64 = (model?.modelfiles ?? model?.modelfile) as string | undefined
-  if (!modelfilesBase64 || typeof modelfilesBase64 !== 'string') {
+  const modelfilesBase64 = modelfilesBase64FromContent(request.type, content)
+  if (!modelfilesBase64) {
     const err: PendingPkgErr = { ok: false, status: 404, error: 'No model package in request' }
     return err
   }
@@ -111,7 +143,7 @@ export async function getBySig(req: Request, res: Response): Promise<void> {
 export async function getModelPreview(req: Request, res: Response): Promise<void> {
   try {
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelAddPackage(typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(typeof sig === 'string' ? sig : '')
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -128,11 +160,11 @@ export async function getModelPreview(req: Request, res: Response): Promise<void
   }
 }
 
-/** Tarball file listing for MODEL_ADD review (same archive as model-preview). */
+/** Tarball file listing for MODEL_ADD / MODEL_UPDATE review (same archive as model-preview). */
 export async function getRequestModelFiles(req: Request, res: Response): Promise<void> {
   try {
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelAddPackage(typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(typeof sig === 'string' ? sig : '')
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -145,12 +177,12 @@ export async function getRequestModelFiles(req: Request, res: Response): Promise
   }
 }
 
-/** Single file from pending MODEL_ADD package (reviewer download). */
+/** Single file from pending MODEL_ADD / MODEL_UPDATE package (reviewer download). */
 export async function getRequestModelFile(req: Request, res: Response): Promise<void> {
   try {
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
     const name = validateFileName(req.query.name)
-    const loaded = await loadPendingModelAddPackage(typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(typeof sig === 'string' ? sig : '')
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -174,11 +206,11 @@ export async function getRequestModelFile(req: Request, res: Response): Promise<
   }
 }
 
-/** Full .tar.gz for pending MODEL_ADD (reviewer download). */
+/** Full .tar.gz for pending MODEL_ADD / MODEL_UPDATE (reviewer download). */
 export async function getRequestModelPackage(req: Request, res: Response): Promise<void> {
   try {
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelAddPackage(typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(typeof sig === 'string' ? sig : '')
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -205,14 +237,14 @@ export async function getRequestModelThumbnail(req: Request, res: Response): Pro
       res.status(404).json({ error: 'Request not found or already processed' })
       return
     }
-    if (request.type !== 'MODEL_ADD' || !request.content || typeof request.content !== 'object') {
-      res.status(400).json({ error: 'Not a MODEL_ADD request or no content' })
+    const pkgTypes = new Set(['MODEL_ADD', 'MODEL_UPDATE'])
+    if (!pkgTypes.has(request.type) || !request.content || typeof request.content !== 'object') {
+      res.status(400).json({ error: 'Not a MODEL_ADD/MODEL_UPDATE request or no content' })
       return
     }
     const content = request.content as Record<string, unknown>
-    const model = content.model as Record<string, unknown> | undefined
-    const thumbB64 = model?.thumbnail
-    if (!thumbB64 || typeof thumbB64 !== 'string') {
+    const thumbB64 = thumbnailBase64FromContent(request.type, content)
+    if (!thumbB64) {
       res.status(404).json({ error: 'No thumbnail in request' })
       return
     }

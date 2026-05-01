@@ -95,6 +95,9 @@
                 <template v-else-if="data.type === 'OBJECT_UPDATE' && data.details?.objectId != null">
                   <ObjectUpdateRequestDetails :details="data.details" />
                 </template>
+                <template v-else-if="data.type === 'MODEL_UPDATE'">
+                  <ModelUpdateRequestDetails :details="data.details || {}" :request-sig="data.sig" />
+                </template>
                 <template v-else-if="data.type === 'OBJECTS_ADD'">
                   <ObjectsAddRequestDetails :details="data.details" />
                 </template>
@@ -176,6 +179,7 @@ import ModelContentCard from '@/components/ModelContentCard.vue'
 import ObjectMap from '@/components/ObjectMap.vue'
 import ObjectDetailsCardLoader from '@/components/ObjectDetailsCardLoader.vue'
 import ObjectUpdateRequestDetails from '@/components/ObjectUpdateRequestDetails.vue'
+import ModelUpdateRequestDetails from '@/components/ModelUpdateRequestDetails.vue'
 import ObjectsAddRequestDetails from '@/components/ObjectsAddRequestDetails.vue'
 import type { ModelDetailsModel } from '@/components/ModelDetailsCard.vue'
 
