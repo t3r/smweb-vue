@@ -165,6 +165,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { usePendingRequestCountStore } from '@/stores/pendingRequestCount'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
 import { useAppToast } from '@/composables/useAppToast'
@@ -190,6 +191,7 @@ interface PendingItem {
 }
 
 const auth = useAuthStore()
+const pendingCountStore = usePendingRequestCountStore()
 const pending = ref<PendingItem[]>([])
 const failed = ref([])
 const expandedRows = ref<Record<number, boolean>>({})
@@ -350,6 +352,7 @@ async function confirmAccept() {
       acceptDialogVisible.value = false
       actionRequest.value = null
       toastSuccess('The request was accepted and applied.', 'Accepted')
+      void pendingCountStore.fetchCount()
       await fetchRequests()
     } else {
       showError((data.error as string) || res.statusText)
@@ -378,6 +381,7 @@ async function confirmDecline() {
       declineDialogVisible.value = false
       onDeclineDialogHide()
       toastSuccess('The request was declined.', 'Declined')
+      void pendingCountStore.fetchCount()
       await fetchRequests()
     } else {
       showError((data.error as string) || res.statusText)

@@ -60,58 +60,28 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import ThemePicker from './ThemePicker.vue'
 import { useAuthStore } from '@/stores/auth'
-
-const PENDING_COUNT_POLL_MS = 15 * 60 * 1000
+import { usePendingRequestCountStore } from '@/stores/pendingRequestCount'
 
 const router = useRouter()
 const auth = useAuthStore()
+const pendingCountStore = usePendingRequestCountStore()
+const { count: pendingRequestCount } = storeToRefs(pendingCountStore)
 const loginMenuRef = ref(null)
-const pendingRequestCount = ref(0)
-
-let pendingCountPollTimer: ReturnType<typeof setInterval> | null = null
-
-async function fetchPendingRequestCount(): Promise<void> {
-  if (!auth.isReviewer) return
-  try {
-    const res = await fetch('/api/position-requests/pending-count', { credentials: 'same-origin' })
-    if (!res.ok) return
-    const data = (await res.json()) as { count?: unknown }
-    const n = data.count
-    pendingRequestCount.value = typeof n === 'number' && Number.isFinite(n) ? n : 0
-  } catch {
-    /* ignore network errors for badge */
-  }
-}
-
-function stopPendingCountPolling(): void {
-  if (pendingCountPollTimer != null) {
-    clearInterval(pendingCountPollTimer)
-    pendingCountPollTimer = null
-  }
-}
-
-function startPendingCountPolling(): void {
-  stopPendingCountPolling()
-  void fetchPendingRequestCount()
-  pendingCountPollTimer = setInterval(() => void fetchPendingRequestCount(), PENDING_COUNT_POLL_MS)
-}
 
 watch(
   () => auth.loaded && auth.isReviewer,
   (active) => {
-    if (active) startPendingCountPolling()
-    else {
-      stopPendingCountPolling()
-      pendingRequestCount.value = 0
-    }
+    if (active) pendingCountStore.startPolling()
+    else pendingCountStore.reset()
   },
   { immediate: true }
 )
 
-onUnmounted(stopPendingCountPolling)
+onUnmounted(() => pendingCountStore.stopPolling())
 
 const gitSlug = typeof __FGS_GIT_SLUG__ !== 'undefined' ? __FGS_GIT_SLUG__ : 'dev'
 const repoWebUrl =
