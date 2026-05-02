@@ -1,7 +1,11 @@
 <template>
   <div>
     <h1 class="mt-0">Pending requests</h1>
-    <p class="text-color-secondary mb-4">Please review these requests.</p>
+    <p v-if="auth.isReviewer" class="text-color-secondary mb-4">Review and accept or decline queued submissions.</p>
+    <p v-else class="text-color-secondary mb-4">
+      All pending submissions are listed here. Expanding a request shows everything your account may access; model files
+      and some details stay restricted unless you submitted the request or are a reviewer.
+    </p>
 
     <div v-if="loading" class="flex align-items-center justify-content-center p-4">
       <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
@@ -34,7 +38,7 @@
             </Column>
             <template #expansion="{ data }">
               <div class="request-details-expansion">
-                <div class="details-actions mb-2">
+                <div v-if="auth.isReviewer" class="details-actions mb-2">
                   <Button
                     label="Accept"
                     icon="pi pi-check"
@@ -111,41 +115,43 @@
         </template>
       </Card>
 
-      <Dialog
-        v-model:visible="acceptDialogVisible"
-        header="Accept request"
-        modal
-        :style="{ width: '28rem' }"
-        :closable="true"
-        @hide="actionRequest = null"
-      >
-        <p class="m-0">Accept this request? The change will be applied to the database.</p>
-        <template #footer>
-          <Button label="Cancel" severity="secondary" @click="acceptDialogVisible = false" />
-          <Button label="Accept" icon="pi pi-check" severity="success" :loading="acceptLoading" @click="confirmAccept" />
-        </template>
-      </Dialog>
+      <template v-if="auth.isReviewer">
+        <Dialog
+          v-model:visible="acceptDialogVisible"
+          header="Accept request"
+          modal
+          :style="{ width: '28rem' }"
+          :closable="true"
+          @hide="actionRequest = null"
+        >
+          <p class="m-0">Accept this request? The change will be applied to the database.</p>
+          <template #footer>
+            <Button label="Cancel" severity="secondary" @click="acceptDialogVisible = false" />
+            <Button label="Accept" icon="pi pi-check" severity="success" :loading="acceptLoading" @click="confirmAccept" />
+          </template>
+        </Dialog>
 
-      <Dialog
-        v-model:visible="declineDialogVisible"
-        header="Decline request"
-        modal
-        :style="{ width: '28rem' }"
-        :closable="true"
-        @hide="onDeclineDialogHide"
-      >
-        <p class="mb-2">Optionally provide a reason for declining (e.g. for internal notes or to inform the submitter).</p>
-        <div class="field">
-          <label for="decline-reason">Reason</label>
-          <InputText id="decline-reason" v-model="declineReason" type="text" placeholder="Reason for declining" class="w-full" />
-        </div>
-        <template #footer>
-          <Button label="Cancel" severity="secondary" @click="declineDialogVisible = false" />
-          <Button label="Decline" icon="pi pi-times" severity="secondary" :loading="declineLoading" @click="confirmDecline" />
-        </template>
-      </Dialog>
+        <Dialog
+          v-model:visible="declineDialogVisible"
+          header="Decline request"
+          modal
+          :style="{ width: '28rem' }"
+          :closable="true"
+          @hide="onDeclineDialogHide"
+        >
+          <p class="mb-2">Optionally provide a reason for declining (e.g. for internal notes or to inform the submitter).</p>
+          <div class="field">
+            <label for="decline-reason">Reason</label>
+            <InputText id="decline-reason" v-model="declineReason" type="text" placeholder="Reason for declining" class="w-full" />
+          </div>
+          <template #footer>
+            <Button label="Cancel" severity="secondary" @click="declineDialogVisible = false" />
+            <Button label="Decline" icon="pi pi-times" severity="secondary" :loading="declineLoading" @click="confirmDecline" />
+          </template>
+        </Dialog>
+      </template>
 
-      <Card v-if="failed.length" >
+      <Card v-if="auth.isReviewer && failed.length" >
         <template #title>Failed to decode</template>
         <template #content>
           <DataTable :value="failed" data-key="id" responsive-layout="scroll" class="p-datatable-sm">
@@ -305,8 +311,8 @@ async function fetchRequests() {
   clearError()
   try {
     const res = await fetch(auth.apiUrl('/api/position-requests'), { credentials: 'include' })
-    if (res.status === 403) {
-      showError('You do not have permission to view position requests.')
+    if (res.status === 401) {
+      showError('Please sign in to view pending requests.')
       pending.value = []
       failed.value = []
       return

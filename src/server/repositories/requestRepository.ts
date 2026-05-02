@@ -3,6 +3,7 @@ import zlib from 'zlib'
 import { sequelize } from '../config/database.js'
 import { QueryTypes } from 'sequelize'
 import * as authorRepo from './authorRepository.js'
+import * as objectRepo from './objectRepository.js'
 
 export const REQUEST_TYPES = {
   OBJECT_UPDATE: 'OBJECT_UPDATE',
@@ -25,7 +26,7 @@ function contentOverview(type: string, content: unknown): unknown {
   switch (type) {
     case 'OBJECT_UPDATE': {
       const c = content as Record<string, unknown>
-      return {
+      const out: Record<string, unknown> = {
         objectId: c.objectId,
         modelId: c.modelId,
         description: c.description,
@@ -35,10 +36,16 @@ function contentOverview(type: string, content: unknown): unknown {
         offset: c.offset,
         orientation: c.orientation,
       }
+      const sid = c.submitterAuthorId
+      if (sid != null && Number.isFinite(Number(sid))) out.submitterAuthorId = Number(sid)
+      return out
     }
     case 'OBJECT_DELETE': {
       const c = content as Record<string, unknown>
-      return { objId: c.objId }
+      const out: Record<string, unknown> = { objId: c.objId }
+      const sid = c.submitterAuthorId
+      if (sid != null && Number.isFinite(Number(sid))) out.submitterAuthorId = Number(sid)
+      return out
     }
     case 'OBJECTS_ADD':
       return Array.isArray(content)
@@ -70,7 +77,10 @@ function contentOverview(type: string, content: unknown): unknown {
     }
     case 'MODEL_DELETE': {
       const c = content as Record<string, unknown>
-      return { modelId: c.modelId ?? c.modelid }
+      const out: Record<string, unknown> = { modelId: c.modelId ?? c.modelid }
+      const mid = c.modifiedByAuthorId
+      if (mid != null && Number.isFinite(Number(mid))) out.modifiedByAuthorId = Number(mid)
+      return out
     }
     default:
       return null
@@ -167,11 +177,14 @@ export async function getPendingRequests(): Promise<{ ok: PendingItem[]; failed:
   const ok: PendingItem[] = []
   const failed: FailedItem[] = []
   const emails: string[] = []
+  /** Pending list indices that reference an object id (for catalogue model author). */
+  const indicesByObjectId = new Map<number, number[]>()
   for (const row of rows) {
     try {
       const decoded = decodeRow(row)
       if (decoded.email) emails.push(decoded.email)
       const details = getRequestContentOverview(decoded.type, decoded.content)
+      const itemIndex = ok.length
       ok.push({
         id: row.spr_id,
         sig: row.spr_hash,
@@ -180,6 +193,21 @@ export async function getPendingRequests(): Promise<{ ok: PendingItem[]; failed:
         comment: decoded.comment,
         details,
       })
+      const c = decoded.content
+      if (
+        (decoded.type === 'OBJECT_UPDATE' || decoded.type === 'OBJECT_DELETE') &&
+        c != null &&
+        typeof c === 'object'
+      ) {
+        const cr = c as Record<string, unknown>
+        const oid =
+          decoded.type === 'OBJECT_UPDATE' ? Number(cr.objectId) : Number(cr.objId)
+        if (Number.isInteger(oid) && oid > 0) {
+          const arr = indicesByObjectId.get(oid) ?? []
+          arr.push(itemIndex)
+          indicesByObjectId.set(oid, arr)
+        }
+      }
     } catch (err) {
       const msg = (err as Error).message
       console.error(`[request] Failed to decode pending request spr_id=${row.spr_id} spr_hash=${row.spr_hash}: ${msg}`)
@@ -187,6 +215,19 @@ export async function getPendingRequests(): Promise<{ ok: PendingItem[]; failed:
     }
   }
   const authorByEmail = await authorRepo.findAuthorsByEmails(emails)
+  const objectIds = [...indicesByObjectId.keys()]
+  const modelAuthorByObjectId =
+    objectIds.length > 0 ? await objectRepo.findModelAuthorIdsByObjectIds(objectIds) : new Map<number, number>()
+  for (const [objectId, indices] of indicesByObjectId) {
+    const derived = modelAuthorByObjectId.get(objectId)
+    if (derived == null) continue
+    for (const ii of indices) {
+      const d = ok[ii]?.details
+      if (d && typeof d === 'object') {
+        ;(d as Record<string, unknown>).derivedModelAuthorId = derived
+      }
+    }
+  }
   for (const item of ok) {
     const key = item.email != null ? String(item.email).trim().toLowerCase() : null
     const info = key != null ? authorByEmail.get(key) : undefined

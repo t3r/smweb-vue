@@ -5,7 +5,7 @@
         <a v-bind="props.action" href="#" @click.prevent>
           <span v-bind="props.label">{{ item.label }}</span>
           <span
-            v-if="item.key === 'pending-requests' && pendingRequestCount > 0"
+            v-if="item.key === 'pending-requests' && auth.isReviewer && pendingRequestCount > 0"
             class="pending-count-pill"
             aria-hidden="true"
           >{{ pendingRequestCount }}</span>
@@ -105,7 +105,7 @@ const navItems = computed(() => {
     { label: 'Authors', command: () => router.push('/authors') },
     { label: 'About', command: () => router.push('/about') },
   ]
-  if (auth.isReviewer) {
+  if (auth.isAuthenticated) {
     items.push({
       key: 'pending-requests',
       label: 'Pending requests',

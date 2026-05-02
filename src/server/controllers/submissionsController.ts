@@ -43,7 +43,9 @@ export async function submitObjectDelete(req: Request, res: Response): Promise<v
       return
     }
     const comment = typeof body.comment === 'string' ? body.comment.trim() : ''
-    const content = { objId }
+    const user = req.user as { id?: number } | undefined
+    const content: Record<string, unknown> = { objId }
+    if (user?.id != null && Number.isInteger(user.id)) content.submitterAuthorId = user.id
     const { id, sig } = await requestRepo.saveRequest(
       requestRepo.REQUEST_TYPES.OBJECT_DELETE,
       content,
@@ -104,7 +106,8 @@ export async function submitObjectUpdate(req: Request, res: Response): Promise<v
       res.status(409).json({ error: 'A pending request already exists for this object' })
       return
     }
-    const content = {
+    const user = req.user as { id?: number } | undefined
+    const content: Record<string, unknown> = {
       objectId,
       modelId: modelId ?? 0,
       description,
@@ -114,6 +117,7 @@ export async function submitObjectUpdate(req: Request, res: Response): Promise<v
       offset: offset === null || (offset as unknown) === '' ? null : offset,
       orientation,
     }
+    if (user?.id != null && Number.isInteger(user.id)) content.submitterAuthorId = user.id
     const comment = typeof body.comment === 'string' ? body.comment.trim() : ''
     const { id, sig } = await requestRepo.saveRequest(
       requestRepo.REQUEST_TYPES.OBJECT_UPDATE,

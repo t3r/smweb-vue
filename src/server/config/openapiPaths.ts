@@ -439,72 +439,88 @@ export const openapiPaths = {
   },
   '/position-requests': {
     get: {
-      tags: ['Position requests', 'Review'],
-      summary: 'List position requests (reviewer)',
+      tags: ['Position requests'],
+      summary: 'List pending position requests',
+      description:
+        'Signed-in users see the same pending queue summary. Failed-decode rows are included only for reviewers. Full payloads and model assets for a request require reviewer role or ownership (see GET /position-requests/{sig}).',
       security: [{ sessionCookie: [] }],
-      responses: { '200': { description: 'Pending + failed decode' }, '403': { description: 'Forbidden' } },
+      responses: {
+        '200': { description: 'Pending (and failed for reviewers only)' },
+        '401': { description: 'Not signed in' },
+      },
     },
   },
   '/position-requests/pending-count': {
     get: {
       tags: ['Position requests', 'Review'],
-      summary: 'Count of pending requests',
+      summary: 'Count of pending requests (reviewers only)',
       security: [{ sessionCookie: [] }],
-      responses: { '200': { description: '{ count: number }' } },
+      responses: {
+        '200': { description: '{ count: number }' },
+        '401': { description: 'Not signed in' },
+        '403': { description: 'Not a reviewer' },
+      },
     },
   },
   '/position-requests/{sig}': {
     get: {
-      tags: ['Position requests', 'Review'],
+      tags: ['Position requests'],
       summary: 'Position request by signature',
+      description: 'Full payload when reviewer or when the request belongs to the signed-in user.',
       security: [{ sessionCookie: [] }],
       parameters: [{ name: 'sig', in: 'path', required: true, schema: { type: 'string' } }],
-      responses: { '200': { description: 'Request' } },
+      responses: {
+        '200': { description: 'Request' },
+        '403': { description: 'Forbidden' },
+        '404': { description: 'Not found' },
+      },
     },
   },
   '/position-requests/{sig}/thumbnail': {
     get: {
-      tags: ['Position requests', 'Review'],
-      summary: 'Thumbnail for request package',
+      tags: ['Position requests'],
+      summary: 'Thumbnail for MODEL_ADD / MODEL_UPDATE package',
       security: [{ sessionCookie: [] }],
       parameters: [{ name: 'sig', in: 'path', required: true, schema: { type: 'string' } }],
-      responses: { '200': { description: 'Image' } },
+      responses: { '200': { description: 'Image' }, '403': { description: 'Forbidden' } },
     },
   },
   '/position-requests/{sig}/model-preview': {
     get: {
-      tags: ['Position requests', 'Review'],
-      summary: 'Model preview for request',
+      tags: ['Position requests'],
+      summary: 'Model preview JSON for pending package',
+      description: 'For pending MODEL_ADD / MODEL_UPDATE, any signed-in user. Otherwise same access rules as GET /position-requests/{sig}.',
       security: [{ sessionCookie: [] }],
       parameters: [{ name: 'sig', in: 'path', required: true, schema: { type: 'string' } }],
-      responses: { '200': { description: 'Preview' } },
+      responses: { '200': { description: 'Preview' }, '403': { description: 'Forbidden' } },
     },
   },
   '/position-requests/{sig}/model-files': {
     get: {
-      tags: ['Position requests', 'Review'],
-      summary: 'Model file list for request',
+      tags: ['Position requests'],
+      summary: 'Tarball file list for pending package',
+      description: 'For pending MODEL_ADD / MODEL_UPDATE, any signed-in user. Otherwise same access rules as GET /position-requests/{sig}.',
       security: [{ sessionCookie: [] }],
       parameters: [{ name: 'sig', in: 'path', required: true, schema: { type: 'string' } }],
-      responses: { '200': { description: 'File list' } },
+      responses: { '200': { description: 'File list' }, '403': { description: 'Forbidden' } },
     },
   },
   '/position-requests/{sig}/file': {
     get: {
-      tags: ['Position requests', 'Review'],
-      summary: 'Single file from request package',
+      tags: ['Position requests'],
+      summary: 'Single file from pending package',
       security: [{ sessionCookie: [] }],
       parameters: [{ name: 'sig', in: 'path', required: true, schema: { type: 'string' } }],
-      responses: { '200': { description: 'File binary' } },
+      responses: { '200': { description: 'File binary' }, '403': { description: 'Forbidden' } },
     },
   },
   '/position-requests/{sig}/package': {
     get: {
-      tags: ['Position requests', 'Review'],
-      summary: 'Download request model package',
+      tags: ['Position requests'],
+      summary: 'Download pending model package',
       security: [{ sessionCookie: [] }],
       parameters: [{ name: 'sig', in: 'path', required: true, schema: { type: 'string' } }],
-      responses: { '200': { description: 'Archive' } },
+      responses: { '200': { description: 'Archive' }, '403': { description: 'Forbidden' } },
     },
   },
   '/email-queue/receive': {

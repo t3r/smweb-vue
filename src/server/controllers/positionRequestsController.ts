@@ -4,6 +4,12 @@ import { getPreviewDataFromPackageBuffer } from '../services/modelService.js'
 import { logDbError, CLIENT_ERROR_MESSAGE } from '../utils/dbFallback.js'
 import { listTarEntries, getTarFileContent } from '../utils/tarList.js'
 import { validateFileName } from '../utils/validateInput.js'
+import {
+  isReviewerOrAbove,
+  sessionMayAccessDecodedPendingRequest,
+  sessionMayAccessPendingModelTarball,
+  type SessionUser,
+} from '../utils/positionRequestsAccess.js'
 
 type PendingPkgOk = { ok: true; buffer: Buffer }
 type PendingPkgErr = { ok: false; status: number; error: string }
@@ -41,7 +47,7 @@ function thumbnailBase64FromContent(type: string, content: Record<string, unknow
   return undefined
 }
 
-async function loadPendingModelPackage(sig: string): Promise<PendingPkgLoad> {
+async function loadPendingModelPackage(req: Request, sig: string): Promise<PendingPkgLoad> {
   if (!sig || typeof sig !== 'string') {
     const err: PendingPkgErr = { ok: false, status: 400, error: 'Missing sig' }
     return err
@@ -49,6 +55,18 @@ async function loadPendingModelPackage(sig: string): Promise<PendingPkgLoad> {
   const request = await requestRepo.getRequestBySig(sig)
   if (!request) {
     const err: PendingPkgErr = { ok: false, status: 404, error: 'Request not found or already processed' }
+    return err
+  }
+  const user = req.user as SessionUser | undefined
+  const allowed =
+    sessionMayAccessPendingModelTarball(user, request.type) ||
+    (await sessionMayAccessDecodedPendingRequest(user, {
+      email: request.email,
+      content: request.content,
+      type: request.type,
+    }))
+  if (!allowed) {
+    const err: PendingPkgErr = { ok: false, status: 403, error: 'Forbidden' }
     return err
   }
   const pkgTypes = new Set(['MODEL_ADD', 'MODEL_UPDATE'])
@@ -102,8 +120,12 @@ export async function getPendingCount(_req: Request, res: Response): Promise<voi
 export async function getList(req: Request, res: Response): Promise<void> {
   try {
     const { ok, failed } = await requestRepo.getPendingRequests()
+    const user = req.user as SessionUser | undefined
+    /** Full queue for any signed-in user; use sessionMayAccess* on :sig and asset routes for row-level data. */
+    const visibleOk = ok
+    const visibleFailed = user && isReviewerOrAbove(user.role) ? failed : []
     res.json({
-      pending: ok.map(({ id, sig, type, email, comment, details, authorId, authorName }) => ({
+      pending: visibleOk.map(({ id, sig, type, email, comment, details, authorId, authorName }) => ({
         id,
         sig,
         type,
@@ -113,7 +135,7 @@ export async function getList(req: Request, res: Response): Promise<void> {
         authorId: authorId ?? null,
         authorName: authorName ?? null,
       })),
-      failed: failed.map(({ id, sig, error }) => ({ id, sig, error })),
+      failed: visibleFailed.map(({ id, sig, error }) => ({ id, sig, error })),
     })
   } catch (err) {
     logDbError(err, 'GET /api/position-requests')
@@ -133,6 +155,15 @@ export async function getBySig(req: Request, res: Response): Promise<void> {
       res.status(404).json({ error: 'Request not found or already processed' })
       return
     }
+    const allowed = await sessionMayAccessDecodedPendingRequest(req.user as SessionUser | undefined, {
+      email: request.email,
+      content: request.content,
+      type: request.type,
+    })
+    if (!allowed) {
+      res.status(403).json({ error: 'Forbidden' })
+      return
+    }
     res.json(request)
   } catch (err) {
     logDbError(err, 'GET /api/position-requests/:sig')
@@ -143,7 +174,7 @@ export async function getBySig(req: Request, res: Response): Promise<void> {
 export async function getModelPreview(req: Request, res: Response): Promise<void> {
   try {
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelPackage(typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '')
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -164,7 +195,7 @@ export async function getModelPreview(req: Request, res: Response): Promise<void
 export async function getRequestModelFiles(req: Request, res: Response): Promise<void> {
   try {
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelPackage(typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '')
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -182,7 +213,7 @@ export async function getRequestModelFile(req: Request, res: Response): Promise<
   try {
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
     const name = validateFileName(req.query.name)
-    const loaded = await loadPendingModelPackage(typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '')
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -210,7 +241,7 @@ export async function getRequestModelFile(req: Request, res: Response): Promise<
 export async function getRequestModelPackage(req: Request, res: Response): Promise<void> {
   try {
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelPackage(typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '')
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -235,6 +266,18 @@ export async function getRequestModelThumbnail(req: Request, res: Response): Pro
     const request = await requestRepo.getRequestBySig(sig)
     if (!request) {
       res.status(404).json({ error: 'Request not found or already processed' })
+      return
+    }
+    const user = req.user as SessionUser | undefined
+    const allowed =
+      sessionMayAccessPendingModelTarball(user, request.type) ||
+      (await sessionMayAccessDecodedPendingRequest(user, {
+        email: request.email,
+        content: request.content,
+        type: request.type,
+      }))
+    if (!allowed) {
+      res.status(403).json({ error: 'Forbidden' })
       return
     }
     const pkgTypes = new Set(['MODEL_ADD', 'MODEL_UPDATE'])

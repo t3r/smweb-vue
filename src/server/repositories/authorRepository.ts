@@ -111,13 +111,18 @@ export async function findAuthorsByEmails(
     },
   })
   const map = new Map<string, { id: number; name: string | null }>()
-  for (const row of rows || []) {
-    const r = row as { id?: number; email?: string; name?: string | null }
-    const e = r.email != null ? String(r.email).trim().toLowerCase() : null
-    if (e != null && r.id != null) {
-      const rawName = r.name != null ? String(r.name).trim() : ''
-      map.set(e, { id: r.id, name: rawName !== '' ? rawName : null })
-    }
+  const rowList = (rows || []) as { id?: number; email?: string; name?: string | null }[]
+  for (const inputNorm of normalized) {
+    const found = rowList.find((r) => {
+      if (r.email == null || r.id == null) return false
+      return String(r.email).trim().toLowerCase() === inputNorm
+    })
+    if (!found?.id) continue
+    const rawName = found.name != null ? String(found.name).trim() : ''
+    const entry = { id: found.id, name: rawName !== '' ? rawName : null }
+    map.set(inputNorm, entry)
+    const dbKey = String(found.email).trim().toLowerCase()
+    if (dbKey !== inputNorm) map.set(dbKey, entry)
   }
   return map
 }

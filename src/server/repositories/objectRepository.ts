@@ -79,6 +79,26 @@ export async function findById(id: number): Promise<MapObject | null> {
   return rows[0] ? rowToObject(rows[0]) : null
 }
 
+/** Model catalogue author (`mo_author`) for each object id (active objects only). */
+export async function findModelAuthorIdsByObjectIds(objectIds: number[]): Promise<Map<number, number>> {
+  const unique = [...new Set(objectIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))]
+  if (!unique.length) return new Map()
+  const rows = (await sequelize.query(
+    `SELECT o.ob_id AS "objectId", m.mo_author AS "authorId"
+     FROM fgs_objects o
+     INNER JOIN fgs_models m ON o.ob_model = m.mo_id
+     WHERE o.ob_id IN (:ids) AND (${ACTIVE_OBJECT_SQL})`,
+    { replacements: { ids: unique }, type: QueryTypes.SELECT }
+  )) as { objectId: number; authorId: number }[]
+  const map = new Map<number, number>()
+  for (const r of rows) {
+    const oid = Number(r.objectId)
+    const aid = Number(r.authorId)
+    if (Number.isInteger(oid) && oid > 0 && Number.isInteger(aid) && aid > 0) map.set(oid, aid)
+  }
+  return map
+}
+
 const ACTIVE_OBJECT_SQL = `(ob_deleted IS NULL OR ob_deleted = '1970-01-01 00:00:01'::timestamp)`
 
 /** Count non-deleted objects using this model (for delete-model guards). */
