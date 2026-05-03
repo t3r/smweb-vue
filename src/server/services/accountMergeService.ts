@@ -25,6 +25,21 @@ export class AccountMergeError extends Error {
   }
 }
 
+/** Structured audit log for account merge (no raw tokens or email addresses). */
+function logAccountMerge(step: string, payload: Record<string, unknown> = {}): void {
+  const line = JSON.stringify({ step, at: new Date().toISOString(), ...payload })
+  console.log(`[account-merge] ${line}`)
+}
+
+function mergeThrow(
+  message: string,
+  statusCode: 400 | 401 | 403 | 404 | 409 | 429 | 500 = 400,
+  audit: Record<string, unknown> = {}
+): never {
+  logAccountMerge('error', { message, statusCode, ...audit })
+  throw new AccountMergeError(message, statusCode)
+}
+
 function normalizeEmail(email: unknown): string {
   return String(email ?? '').trim().toLowerCase()
 }
@@ -91,36 +106,56 @@ export async function initiateMerge(
   body: { targetEmail?: unknown; targetAuthorId?: unknown }
 ): Promise<{ mergeRequestId: string; expiresAt: string }> {
   const srcId = Number(sourceAuthorId)
-  if (!Number.isInteger(srcId) || srcId < 1) throw new AccountMergeError('Invalid session author', 403)
+  if (!Number.isInteger(srcId) || srcId < 1) mergeThrow('Invalid session author', 403, { op: 'initiate' })
 
   let targetId: number | null = null
+  let targetResolvedBy: 'authorId' | 'email' | null = null
   const tid = body.targetAuthorId != null ? Number(body.targetAuthorId) : null
   const emailRaw = body.targetEmail != null ? String(body.targetEmail).trim() : ''
 
   if (tid != null && Number.isInteger(tid) && tid >= 1) {
     targetId = tid
+    targetResolvedBy = 'authorId'
   } else if (emailRaw) {
     const byEmail = await authorRepo.findAuthorByEmail(emailRaw)
     targetId = byEmail?.id ?? null
+    targetResolvedBy = 'email'
   }
 
-  if (targetId == null) throw new AccountMergeError('Target author not found', 404)
-  if (targetId === srcId) throw new AccountMergeError('Cannot merge an author with itself', 400)
+  logAccountMerge('initiate.start', {
+    sourceAuthorId: srcId,
+    targetAuthorId: targetId,
+    targetResolvedBy,
+    hadEmailLookup: Boolean(emailRaw),
+  })
+
+  if (targetId == null) mergeThrow('Target author not found', 404, { op: 'initiate', sourceAuthorId: srcId })
+  if (targetId === srcId) mergeThrow('Cannot merge an author with itself', 400, { op: 'initiate', sourceAuthorId: srcId })
 
   const target = await loadAuthorRow(targetId)
-  if (!target) throw new AccountMergeError('Target author not found', 404)
+  if (!target) mergeThrow('Target author not found', 404, { op: 'initiate', sourceAuthorId: srcId, targetAuthorId: targetId })
 
   const targetEmailNorm = normalizeEmail(target.email)
   if (!targetEmailNorm) {
-    throw new AccountMergeError('Target author has no email; merge cannot be verified', 400)
+    mergeThrow('Target author has no email; merge cannot be verified', 400, {
+      op: 'initiate',
+      sourceAuthorId: srcId,
+      targetAuthorId: targetId,
+    })
   }
 
   const nHour = await mergeRepo.countInitiationsInLastHour(srcId)
   if (nHour >= MAX_INITIATIONS_PER_HOUR) {
-    throw new AccountMergeError('Too many merge requests; try again later', 429)
+    mergeThrow('Too many merge requests; try again later', 429, {
+      op: 'initiate',
+      sourceAuthorId: srcId,
+      targetAuthorId: targetId,
+      initiationsLastHour: nHour,
+    })
   }
 
   await mergeRepo.cancelOpenRequestsForPair(srcId, targetId)
+  logAccountMerge('initiate.cancelled_prior_open', { sourceAuthorId: srcId, targetAuthorId: targetId })
 
   const rawToken = crypto.randomBytes(32).toString('base64url')
   const tokenHash = hashMergeToken(rawToken)
@@ -151,27 +186,67 @@ export async function initiateMerge(
     expiresAt: expiresAt.toISOString(),
   })
 
+  logAccountMerge('initiate.email_enqueued', {
+    mergeRequestId,
+    sourceAuthorId: srcId,
+    targetAuthorId: targetId,
+    eventType: EmailEventType.ACCOUNT_MERGE_CONFIRM,
+  })
+  logAccountMerge('initiate.complete', {
+    mergeRequestId,
+    sourceAuthorId: srcId,
+    targetAuthorId: targetId,
+    expiresAt: expiresAt.toISOString(),
+  })
+
   return { mergeRequestId, expiresAt: expiresAt.toISOString() }
 }
 
-async function loadMergeRequestVerified(rawToken: string, amrId: string): Promise<{ row: MergeRequestRow }> {
+async function loadMergeRequestVerified(
+  rawToken: string,
+  amrId: string,
+  op: string
+): Promise<{ row: MergeRequestRow }> {
   const row = await mergeRepo.findById(amrId)
   if (!row || row.amr_confirmed_at != null || row.amr_cancelled_at != null) {
-    throw new AccountMergeError('Merge request not found or no longer valid', 404)
+    mergeThrow('Merge request not found or no longer valid', 404, {
+      op: 'load_merge_request',
+      phase: op,
+      mergeRequestId: amrId,
+      reason: 'missing_or_terminal',
+    })
   }
   const exp =
     row.amr_expires_at instanceof Date
       ? row.amr_expires_at.getTime()
       : new Date(row.amr_expires_at).getTime()
-  if (exp < Date.now()) throw new AccountMergeError('Merge request expired', 404)
+  if (exp < Date.now()) {
+    mergeThrow('Merge request expired', 404, {
+      op: 'load_merge_request',
+      phase: op,
+      mergeRequestId: amrId,
+      reason: 'expired',
+    })
+  }
 
   const tokenHash = hashMergeToken(rawToken)
   const stored = row.amr_token_hash
   const stBuf = Buffer.isBuffer(stored) ? stored : Buffer.from(stored as Uint8Array)
   if (!timingSafeBufEqual(tokenHash, stBuf)) {
-    throw new AccountMergeError('Merge request not found', 404)
+    mergeThrow('Merge request not found', 404, {
+      op: 'load_merge_request',
+      phase: op,
+      mergeRequestId: amrId,
+      reason: 'token_mismatch',
+    })
   }
 
+  logAccountMerge('load_merge_request.ok', {
+    phase: op,
+    mergeRequestId: amrId,
+    sourceAuthorId: row.amr_source_author_id,
+    targetAuthorId: row.amr_target_author_id,
+  })
   return { row }
 }
 
@@ -180,9 +255,15 @@ export async function previewMerge(
   rawToken: string,
   amrId: string
 ): Promise<Record<string, unknown>> {
-  const { row } = await loadMergeRequestVerified(rawToken, amrId)
+  logAccountMerge('preview.start', { sessionAuthorId, mergeRequestId: amrId })
+  const { row } = await loadMergeRequestVerified(rawToken, amrId, 'preview')
   if (row.amr_source_author_id !== sessionAuthorId) {
-    throw new AccountMergeError('You must be signed in as the account that started this merge', 403)
+    mergeThrow('You must be signed in as the account that started this merge', 403, {
+      op: 'preview',
+      mergeRequestId: amrId,
+      sessionAuthorId,
+      sourceAuthorId: row.amr_source_author_id,
+    })
   }
 
   const sourceId = row.amr_source_author_id
@@ -204,6 +285,15 @@ export async function previewMerge(
   ])
 
   const mergedRole = pickHigherRole(roleSource, roleTarget)
+
+  logAccountMerge('preview.complete', {
+    mergeRequestId: row.amr_id,
+    sessionAuthorId,
+    keeperId,
+    loserId,
+    counts: { models: modelsCount, news: newsCount, oauthIdentities: oauthCount },
+    mergedRole,
+  })
 
   return {
     mergeRequestId: row.amr_id,
@@ -229,16 +319,29 @@ async function runMergeTransaction(
   const keeperId = Math.min(sourceId, targetId)
   const loserId = Math.max(sourceId, targetId)
 
+  logAccountMerge('transaction.start', {
+    mergeRequestId: amrId,
+    sourceId,
+    targetId,
+    keeperId,
+    loserId,
+  })
+
   return sequelize.transaction(async (transaction) => {
     const targetRow = await Author.findByPk(targetId, {
       attributes: ['id', 'email'],
       transaction,
       lock: true,
     })
-    if (!targetRow) throw new AccountMergeError('Target author disappeared', 409)
+    if (!targetRow) mergeThrow('Target author disappeared', 409, { op: 'transaction', mergeRequestId: amrId, targetId })
     const currentEmail = normalizeEmail((targetRow as { get: (k: string) => unknown }).get('email'))
     if (currentEmail !== normalizeEmail(snapshotEmail)) {
-      throw new AccountMergeError('Target email changed since merge was requested; cancel and start again', 409)
+      mergeThrow('Target email changed since merge was requested; cancel and start again', 409, {
+        op: 'transaction',
+        mergeRequestId: amrId,
+        targetId,
+        reason: 'email_snapshot_mismatch',
+      })
     }
 
     await sequelize.query(
@@ -294,6 +397,11 @@ async function runMergeTransaction(
       { replacements: { keeperId, amrId }, transaction }
     )
 
+    logAccountMerge('transaction.complete', {
+      mergeRequestId: amrId,
+      keeperId,
+      loserId,
+    })
     return keeperId
   })
 }
@@ -304,9 +412,15 @@ export async function confirmMerge(
   amrId: string,
   req: Request
 ): Promise<{ keeperAuthorId: number }> {
-  const { row } = await loadMergeRequestVerified(rawToken, amrId)
+  logAccountMerge('confirm.start', { sessionAuthorId, mergeRequestId: amrId })
+  const { row } = await loadMergeRequestVerified(rawToken, amrId, 'confirm')
   if (row.amr_source_author_id !== sessionAuthorId) {
-    throw new AccountMergeError('You must be signed in as the account that started this merge', 403)
+    mergeThrow('You must be signed in as the account that started this merge', 403, {
+      op: 'confirm',
+      mergeRequestId: amrId,
+      sessionAuthorId,
+      sourceAuthorId: row.amr_source_author_id,
+    })
   }
 
   const sourceId = row.amr_source_author_id
@@ -315,26 +429,66 @@ export async function confirmMerge(
   const keeperId = await runMergeTransaction(sourceId, targetId, row.amr_target_email_at_create, amrId)
 
   const sessionUser = await getSessionUserByAuthorId(keeperId)
-  if (!sessionUser) throw new AccountMergeError('Could not reload session user after merge', 500)
-
-  await new Promise<void>((resolve, reject) => {
-    req.login(sessionUser as unknown as Express.User, (err: Error | undefined) => {
-      if (err) reject(err)
-      else resolve()
+  if (!sessionUser) {
+    mergeThrow('Could not reload session user after merge', 500, {
+      op: 'confirm',
+      mergeRequestId: amrId,
+      keeperAuthorId: keeperId,
     })
+  }
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      req.login(sessionUser as unknown as Express.User, (err: Error | undefined) => {
+        if (err) reject(err)
+        else resolve()
+      })
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logAccountMerge('confirm.session_login_failed', {
+      mergeRequestId: amrId,
+      keeperAuthorId: keeperId,
+      message: msg,
+    })
+    throw err
+  }
+
+  logAccountMerge('confirm.complete', {
+    mergeRequestId: amrId,
+    keeperAuthorId: keeperId,
+    sourceAuthorId: sourceId,
+    targetAuthorId: targetId,
   })
 
   return { keeperAuthorId: keeperId }
 }
 
 export async function cancelMerge(sessionAuthorId: number, amrId: string): Promise<void> {
+  logAccountMerge('cancel.start', { sessionAuthorId, mergeRequestId: amrId })
   const row = await mergeRepo.findById(amrId)
-  if (!row) throw new AccountMergeError('Merge request not found', 404)
+  if (!row) mergeThrow('Merge request not found', 404, { op: 'cancel', mergeRequestId: amrId, sessionAuthorId })
   if (row.amr_confirmed_at != null || row.amr_cancelled_at != null) {
-    throw new AccountMergeError('Merge request is no longer pending', 409)
+    mergeThrow('Merge request is no longer pending', 409, {
+      op: 'cancel',
+      mergeRequestId: amrId,
+      sessionAuthorId,
+      reason: 'not_pending',
+    })
   }
   if (row.amr_source_author_id !== sessionAuthorId) {
-    throw new AccountMergeError('Forbidden', 403)
+    mergeThrow('Forbidden', 403, {
+      op: 'cancel',
+      mergeRequestId: amrId,
+      sessionAuthorId,
+      sourceAuthorId: row.amr_source_author_id,
+    })
   }
   await mergeRepo.markCancelled(amrId)
+  logAccountMerge('cancel.complete', {
+    mergeRequestId: amrId,
+    sessionAuthorId,
+    sourceAuthorId: row.amr_source_author_id,
+    targetAuthorId: row.amr_target_author_id,
+  })
 }

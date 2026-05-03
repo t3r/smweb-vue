@@ -217,11 +217,12 @@ router.get(
 
 function mergeError(res: Response, err: unknown): void {
   if (err instanceof AccountMergeError) {
+    // Account merge errors are already logged in accountMergeService (mergeThrow / validation).
     res.status(err.statusCode).json({ error: err.message })
     return
   }
   const msg = err instanceof Error ? err.message : String(err)
-  console.error('[auth/merge]', msg)
+  console.error('[account-merge] http.unexpected_error', msg)
   res.status(500).json({ error: 'Could not complete merge operation' })
 }
 
