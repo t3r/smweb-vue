@@ -136,6 +136,18 @@ describe('validateModelFileBuffers', () => {
     expect(err).toMatch(/missing\.png/)
   })
 
+  it('rejects AC texture reference with path or traversal', async () => {
+    const tex = await pngPow2()
+    const err = await validateModelFileBuffers({
+      acBuffer: acLines(['subdir/foo.png']),
+      acFilename: 'm.ac',
+      xmlBuffer: null,
+      xmlFilename: null,
+      pngFiles: [{ name: 'foo.png', buffer: tex }],
+    })
+    expect(err).toMatch(/flat file name/)
+  })
+
   it('rejects non-power-of-two PNG dimensions', async () => {
     const bad = await sharp({
       create: { width: 3, height: 3, channels: 3, background: '#000' },

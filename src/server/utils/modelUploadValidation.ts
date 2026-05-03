@@ -85,13 +85,19 @@ export function validateAc3dXmlPngNames(acName: string, xmlName: string | null, 
   return null
 }
 
-function extractTextureRefsFromAc(acText: string): string[] {
+/** Texture names must match flat upload rules (same as PNG entries in the archive). */
+function extractTextureRefsFromAc(acText: string): { refs: string[]; invalidRef: string | null } {
   const refs: string[] = []
   for (const line of acText.split(/\n/)) {
     const m = line.match(/^\s*texture\s+"([^"]+)"/i)
-    if (m?.[1]) refs.push(m[1])
+    if (!m?.[1]) continue
+    const texName = m[1].trim()
+    if (assertFlatUploadFilename(texName) !== texName) {
+      return { refs: [], invalidRef: texName }
+    }
+    refs.push(texName)
   }
-  return refs
+  return { refs, invalidRef: null }
 }
 
 function readXmlPathElement(xmlStr: string): { ok: true; path: string } | { ok: false; error: string } {
@@ -133,7 +139,10 @@ export async function validateModelFileBuffers(params: {
   }
 
   const pngNameSet = new Set(pngFiles.map((f) => f.name))
-  const textureRefs = extractTextureRefsFromAc(acText)
+  const { refs: textureRefs, invalidRef } = extractTextureRefsFromAc(acText)
+  if (invalidRef != null) {
+    return `AC3D texture reference "${invalidRef}" must be a single flat file name (no path segments or '..').`
+  }
   for (const ref of textureRefs) {
     if (!pngNameSet.has(ref)) {
       return `AC3D references texture "${ref}" but no uploaded PNG with that exact name was provided.`
