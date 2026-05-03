@@ -62,6 +62,15 @@ function getFrontendOrigin(): string {
 
 const FRONTEND_ORIGIN = getFrontendOrigin()
 
+/** Body-parser defaults to 100kb; model JSON uses base64 tarballs (see tarList MAX_TAR_DECOMPRESSED_BYTES). */
+function bodyParserLimitFromEnv(name: string, fallback: string): string {
+  const v = process.env[name]?.trim()
+  return v && v.length > 0 ? v : fallback
+}
+
+const JSON_BODY_LIMIT = bodyParserLimitFromEnv('EXPRESS_JSON_BODY_LIMIT', '80mb')
+const URLENCODED_BODY_LIMIT = bodyParserLimitFromEnv('EXPRESS_URLENCODED_BODY_LIMIT', '512kb')
+
 const mapTileSources = [
   'https://tile.openstreetmap.org',
   'https://demotiles.maplibre.org',
@@ -84,8 +93,8 @@ app.use(
 )
 app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }))
 app.use(morgan('combined'))
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use(express.json({ limit: JSON_BODY_LIMIT }))
+app.use(express.urlencoded({ extended: true, limit: URLENCODED_BODY_LIMIT }))
 app.use(sessionMiddleware)
 app.use(passport.initialize())
 app.use(passport.session())
