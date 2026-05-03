@@ -7,6 +7,7 @@ const routeComponents: Record<AppRouteName, () => Promise<RouteRecordRaw['compon
   Home: () => import('@/views/HomeView.vue'),
   News: () => import('@/views/NewsView.vue'),
   About: () => import('@/views/AboutView.vue'),
+  Help: () => import('@/views/HelpView.vue'),
   Models: () => import('@/views/ModelsView.vue'),
   AddModel: () => import('@/views/AddModelView.vue'),
   EditModel: () => import('@/views/AddModelView.vue'),

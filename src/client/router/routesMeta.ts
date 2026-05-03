@@ -6,6 +6,7 @@ export const ROUTES_META = [
   { path: '/', name: 'Home', title: 'Home' },
   { path: '/news', name: 'News', title: 'News' },
   { path: '/about', name: 'About', title: 'About' },
+  { path: '/help', name: 'Help', title: 'Help' },
   { path: '/models', name: 'Models', title: 'Models' },
   { path: '/models/add', name: 'AddModel', title: 'Add model' },
   { path: '/models/:id/edit', name: 'EditModel', title: 'Update model' },

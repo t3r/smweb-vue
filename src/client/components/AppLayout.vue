@@ -104,6 +104,7 @@ const navItems = computed(() => {
     { label: 'Objects', command: () => router.push('/objects') },
     { label: 'Authors', command: () => router.push('/authors') },
     { label: 'About', command: () => router.push('/about') },
+    { label: 'Help', command: () => router.push('/help') },
   ]
   if (auth.isAuthenticated) {
     items.push({
