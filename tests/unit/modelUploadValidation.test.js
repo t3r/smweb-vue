@@ -163,6 +163,21 @@ describe('validateModelFileBuffers', () => {
     expect(err).toMatch(/encoding="UTF-8"/)
   })
 
+  it('rejects XML with DOCTYPE (XXE / entity-bomb hardening)', async () => {
+    const tex = await pngPow2()
+    const err = await validateModelFileBuffers({
+      acBuffer: acLines(['t.png']),
+      acFilename: 'm.ac',
+      xmlBuffer: Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8" ?>\n<!DOCTYPE root [<!ENTITY x "y">]>\n<PropertyList><path>m.ac</path></PropertyList>',
+        'utf8'
+      ),
+      xmlFilename: 'm.xml',
+      pngFiles: [{ name: 't.png', buffer: tex }],
+    })
+    expect(err).toMatch(/DOCTYPE/)
+  })
+
   it('rejects path element not matching AC filename', async () => {
     const err = await validateModelFileBuffers({
       acBuffer: acLines([]),

@@ -25,6 +25,21 @@ const RE_MODEL_GROUP_ID = /^[0-9]+$/
 const RE_AUTHOR_ID = /^[0-9]{1,3}$/
 
 const XML_DECL_RE = /^<\?xml\s+version="1\.0"\s+encoding="UTF-8"\s*\?>/i
+/** Disallow DTD: mitigates DoS from huge internal subsets; external SYSTEM is unsupported by the parser but we reject explicitly. */
+const DOCTYPE_RE = /<!DOCTYPE[\s\[]/i
+
+/**
+ * Safe defaults for untrusted model XML (uploads). Entity expansion off; no network/file resolution.
+ * @see https://github.com/NaturalIntelligence/fast-xml-parser — external SYSTEM entities are rejected; internal entities stay inert when disabled.
+ */
+const MODEL_XML_PARSER_OPTIONS = {
+  ignoreAttributes: false,
+  trimValues: true,
+  parseTagValue: false,
+  processEntities: false,
+  /** Library option name is `removeNSPrefix` (not `resolveNameSpace`). `false` = keep `prefix:local` names; matches parser default. */
+  removeNSPrefix: false,
+} as const
 
 function stripUtf8Bom(buf: Buffer): Buffer {
   if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) {
@@ -84,12 +99,11 @@ function readXmlPathElement(xmlStr: string): { ok: true; path: string } | { ok: 
   if (!XML_DECL_RE.test(trimmed)) {
     return { ok: false, error: 'XML must start with <?xml version="1.0" encoding="UTF-8" ?>.' }
   }
+  if (DOCTYPE_RE.test(xmlStr)) {
+    return { ok: false, error: 'DOCTYPE is not allowed in model XML (security).' }
+  }
   try {
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      trimValues: true,
-      parseTagValue: false,
-    })
+    const parser = new XMLParser(MODEL_XML_PARSER_OPTIONS)
     const doc = parser.parse(xmlStr) as Record<string, unknown>
     const pl = doc.PropertyList as Record<string, unknown> | undefined
     const raw = pl?.path ?? doc.path
