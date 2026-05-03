@@ -420,7 +420,9 @@ export async function validateModelfileBase64Package(
     return 'Model package is not valid base64.'
   }
   const map = extractTarToMap(buffer)
-  if (map.size === 0) return 'Model package is empty or not a valid gzip/tar archive.'
+  if (map.size === 0) {
+    return 'Model package is empty, not a valid gzip/tar archive, or exceeds safe decompression size limits.'
+  }
 
   const acEntries: { name: string; buffer: Buffer }[] = []
   const xmlEntries: { name: string; buffer: Buffer }[] = []

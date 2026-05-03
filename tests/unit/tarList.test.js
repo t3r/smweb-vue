@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import zlib from 'zlib'
-import { listTarEntries, extractTarToMap, getTarFileContent } from '../../src/server/utils/tarList.ts'
+import {
+  listTarEntries,
+  extractTarToMap,
+  getTarFileContent,
+  MAX_TAR_DECOMPRESSED_BYTES,
+} from '../../src/server/utils/tarList.ts'
 
 /** Minimal POSIX ustar header (512 bytes) + file body padded to 512 multiple. */
 function makeTarWithOneFile(name, content) {
@@ -52,6 +57,18 @@ describe('extractTarToMap', () => {
     const tar = makeTarWithOneFile('readme.txt', 'abc')
     const m = extractTarToMap(tar)
     expect(m.get('readme.txt')?.toString('utf8')).toBe('abc')
+  })
+
+  it('returns empty map when tar header declares file larger than max entry size', () => {
+    const header = Buffer.alloc(512, 0)
+    Buffer.from('x.txt', 'utf8').copy(header, 0)
+    const bogusSizeOct = (MAX_TAR_DECOMPRESSED_BYTES + 1).toString(8) + '\0'
+    Buffer.from(bogusSizeOct.padStart(12, '0'), 'ascii').copy(header, 124)
+    header[156] = 0x30
+    const end = Buffer.alloc(1024, 0)
+    const tar = Buffer.concat([header, end])
+    expect(extractTarToMap(tar).size).toBe(0)
+    expect(listTarEntries(tar)).toEqual([])
   })
 })
 
