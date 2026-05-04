@@ -6,6 +6,8 @@
 
 This repository is the **web application and API** for the FlightGear **scenery database**: shared 3D models, object placements, authors, and the review workflow for community submissions. It replaces the **legacy PHP application** (still referenced in the ecosystem as the previous scenery site) with a **Vue 3 + Node.js (Express) + PostgreSQL** stack, open source and backed by automated tests and CI.
 
+This is the code driving https://scenery.flightgear.org/
+
 ## Architecture (overview)
 
 ```

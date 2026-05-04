@@ -31,6 +31,9 @@
             </template>
           </div>
           <ThemePicker />
+          <a href="https://github.com/t3r/smweb-vue" target="_blank" title="Project on github">
+            <i class="pi pi-github"></i>
+          </a>
         </div>
       </template>
     </Menubar>
