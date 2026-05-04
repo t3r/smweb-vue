@@ -64,7 +64,7 @@ export async function getHistory(): Promise<{ series: StatisticsHistoryPoint[] }
   return { series }
 }
 
-const LEADERBOARD_TOP_N = 3
+const LEADERBOARD_TOP_N = 5
 const LEADERBOARD_RECENT_DAYS = 180
 
 export interface AuthorContributionsLeaderboard {
