@@ -33,6 +33,12 @@
       <ModelDetailsCard :model="modelForDetailsCard" />
 
       <ModelContentCard class="mt-3" :model-id="model.id" />
+      <ModelContentCard
+        v-if="model.hasGltf"
+        class="mt-3"
+        :model-id="model.id"
+        format="gltf"
+      />
 
       <ModelAddPlacementsPanel
         v-if="model.isStatic === false"
@@ -166,6 +172,7 @@ const model = ref<{
   hasPendingRequest?: boolean
   isStatic?: boolean
   groupId?: number
+  hasGltf?: boolean
 } | null>(null)
 const loading = ref(true)
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()

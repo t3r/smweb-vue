@@ -52,6 +52,14 @@
       <div v-if="requestSig" class="comparison-package mt-3">
         <h4 class="comparison-heading">Requested package</h4>
         <ModelContentCard :request-sig="requestSig" :filename="requested.filename || undefined" compact />
+        <ModelContentCard
+          v-if="hasGltf"
+          class="mt-2"
+          :request-sig="requestSig"
+          :filename="requested.filename || undefined"
+          format="gltf"
+          compact
+        />
       </div>
     </template>
     <ErrorDialog v-model:visible="errorDialogVisible" :message="error" @cleared="onErrorDialogCleared" />
@@ -115,6 +123,12 @@ const requested = computed(() => {
 })
 
 const modelId = computed(() => (Number.isFinite(requested.value.modelId) ? requested.value.modelId : NaN))
+
+/** Sanitized pending MODEL_UPDATE details expose `hasGltf` when a glTF tarball was submitted (see requestRepository). */
+const hasGltf = computed(() => {
+  const d = props.details as Record<string, unknown>
+  return d.hasGltf === true
+})
 
 function groupLabel(id: number | null): string {
   if (id == null || !Number.isFinite(id)) return '—'

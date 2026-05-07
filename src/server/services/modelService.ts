@@ -9,6 +9,7 @@ interface ModelRow {
   notes: string | null
   modified: unknown
   shared: number
+  gltfModelfile?: string | null
   Author?: { id: number; name: string } | null
   ModelGroup?: { id: number; name: string } | null
 }
@@ -27,8 +28,21 @@ function toApiModel(row: ModelRow | null): Record<string, unknown> | null {
     /** `fgs_models.mo_shared` / model group id; `0` means static-only (OBJECT_STATIC), not multi-placement shared. */
     groupId: row.shared,
     isStatic: row.shared === 0,
+    hasGltf: !!(row.gltfModelfile && String(row.gltfModelfile).trim() !== ''),
     lastUpdated: row.modified,
   }
+}
+
+type ModelPackageFormat = 'ac' | 'gltf'
+
+function normalizePackageFormat(format?: string | null): ModelPackageFormat {
+  return format === 'gltf' ? 'gltf' : 'ac'
+}
+
+async function getPackageBase64ByFormat(id: number, format?: string | null): Promise<string | null> {
+  const normalized = normalizePackageFormat(format)
+  if (normalized === 'gltf') return modelRepo.findGltfModelfileBase64ById(id)
+  return modelRepo.findModelfileBase64ById(id)
 }
 
 export async function getModels(
@@ -66,8 +80,8 @@ export async function getModelById(id: number): Promise<Record<string, unknown> 
   return toApiModel(row)
 }
 
-export async function getModelFiles(id: number): Promise<{ files: { name: string; size: number }[] }> {
-  const base64 = await modelRepo.findModelfileBase64ById(id)
+export async function getModelFiles(id: number, format?: string | null): Promise<{ files: { name: string; size: number }[] }> {
+  const base64 = await getPackageBase64ByFormat(id, format)
   if (!base64) return { files: [] }
   try {
     const buffer = Buffer.from(base64, 'base64')
@@ -80,9 +94,10 @@ export async function getModelFiles(id: number): Promise<{ files: { name: string
 
 export async function getModelFileContent(
   id: number,
-  filename: string
+  filename: string,
+  format?: string | null
 ): Promise<{ buffer: Buffer; filename: string } | null> {
-  const base64 = await modelRepo.findModelfileBase64ById(id)
+  const base64 = await getPackageBase64ByFormat(id, format)
   if (!base64) return null
   try {
     const buffer = Buffer.from(base64, 'base64')
@@ -93,8 +108,8 @@ export async function getModelFileContent(
   }
 }
 
-export async function getModelPackageBuffer(id: number): Promise<Buffer | null> {
-  const base64 = await modelRepo.findModelfileBase64ById(id)
+export async function getModelPackageBuffer(id: number, format?: string | null): Promise<Buffer | null> {
+  const base64 = await getPackageBase64ByFormat(id, format)
   if (!base64) return null
   try {
     return Buffer.from(base64, 'base64')

@@ -48,6 +48,7 @@ async function executeModelAdd(content: Record<string, unknown>): Promise<{ mode
     notes: (mo.description as string) || '',
     thumbfileBase64: mo.thumbnail as string | undefined,
     modelfileBase64: mo.modelfiles as string,
+    gltfModelfileBase64: (mo.gltfModelfiles as string | undefined) ?? null,
     shared: Number(mo.modelgroup),
     modifiedBy: authorId,
   })
@@ -76,7 +77,7 @@ async function executeModelUpdate(content: Record<string, unknown>): Promise<{ m
   const modelid = Number(content.modelid)
   const authorId: number = Number(content.author)
   const shared: number = Number(content.modelgroup)
-  await modelRepo.updateOne(modelid, {
+  const updatePayload: import('../repositories/modelRepository.js').UpdateModelData = {
     path: content.filename as string,
     authorId,
     name: content.name as string,
@@ -85,7 +86,11 @@ async function executeModelUpdate(content: Record<string, unknown>): Promise<{ m
     modelfileBase64: content.modelfiles as string,
     shared,
     modifiedBy: authorId,
-  })
+  }
+  if (Object.prototype.hasOwnProperty.call(content, 'gltfModelfiles')) {
+    updatePayload.gltfModelfileBase64 = (content.gltfModelfiles as string | undefined) ?? null
+  }
+  await modelRepo.updateOne(modelid, updatePayload)
   return { modelId: modelid }
 }
 

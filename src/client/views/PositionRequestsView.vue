@@ -77,6 +77,14 @@
                         :filename="data.details.model?.filename"
                         compact
                       />
+                      <ModelContentCard
+                        v-if="modelAddHasGltf(data.details)"
+                        class="mt-2"
+                        :request-sig="data.sig"
+                        :filename="data.details.model?.filename"
+                        format="gltf"
+                        compact
+                      />
                     </div>
                     <div v-if="objectPositionFromDetails(data.details.object)" class="details-map-wrap">
                       <ObjectMap
@@ -278,6 +286,13 @@ function objectPositionFromDetails(obj: Record<string, unknown> | null | undefin
 function objectMapCenter(obj: Record<string, unknown> | null | undefined): [number, number] {
   const pos = objectPositionFromDetails(obj)
   return pos ? [pos.lon, pos.lat] : [10, 53.5]
+}
+
+function modelAddHasGltf(details: unknown): boolean {
+  if (!details || typeof details !== 'object') return false
+  const model = (details as { model?: unknown }).model
+  if (!model || typeof model !== 'object') return false
+  return (model as { hasGltf?: unknown }).hasGltf === true
 }
 
 function truncate(str) {

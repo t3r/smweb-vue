@@ -14,6 +14,13 @@ import {
 
 const MODEL_SORT_FIELDS = new Set(['id', 'name', 'lastUpdated', 'group', 'author'])
 
+function parseModelPackageFormat(raw: unknown): 'ac' | 'gltf' | null {
+  if (raw == null || raw === '') return 'ac'
+  const value = String(raw).trim().toLowerCase()
+  if (value === 'ac' || value === 'gltf') return value
+  return null
+}
+
 export async function getModels(req: Request, res: Response): Promise<void> {
   try {
     const { offset, limit, group, author, sortField, sortOrder, search, authorSearch } = req.query
@@ -109,7 +116,12 @@ export async function getModelFiles(req: Request, res: Response): Promise<void> 
       res.status(404).json({ error: 'Model not found' })
       return
     }
-    const data = await modelService.getModelFiles(id)
+    const format = parseModelPackageFormat(req.query.format)
+    if (format == null) {
+      res.status(400).json({ error: 'Invalid format query parameter (use ac or gltf)' })
+      return
+    }
+    const data = await modelService.getModelFiles(id, format)
     res.json(data)
   } catch (err) {
     logDbError(err, 'GET /api/models/:id/files')
@@ -129,12 +141,17 @@ export async function getModelFile(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: 'Missing or invalid name query parameter' })
       return
     }
+    const format = parseModelPackageFormat(req.query.format)
+    if (format == null) {
+      res.status(400).json({ error: 'Invalid format query parameter (use ac or gltf)' })
+      return
+    }
     const model = await modelService.getModelById(id)
     if (!model) {
       res.status(404).json({ error: 'Model not found' })
       return
     }
-    const result = await modelService.getModelFileContent(id, name)
+    const result = await modelService.getModelFileContent(id, name, format)
     if (!result) {
       res.status(404).json({ error: 'File not found in model' })
       return
@@ -142,6 +159,9 @@ export async function getModelFile(req: Request, res: Response): Promise<void> {
     const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : ''
     const mime: Record<string, string> = {
       '.ac': 'application/octet-stream',
+      '.gltf': 'model/gltf+json',
+      '.glb': 'model/gltf-binary',
+      '.bin': 'application/octet-stream',
       '.xml': 'application/xml',
       '.png': 'image/png',
       '.jpg': 'image/jpeg',
@@ -170,12 +190,17 @@ export async function getModelPackage(req: Request, res: Response): Promise<void
       res.status(404).json({ error: 'Model not found' })
       return
     }
-    const buffer = await modelService.getModelPackageBuffer(id)
+    const format = parseModelPackageFormat(req.query.format)
+    if (format == null) {
+      res.status(400).json({ error: 'Invalid format query parameter (use ac or gltf)' })
+      return
+    }
+    const buffer = await modelService.getModelPackageBuffer(id, format)
     if (!buffer || buffer.length === 0) {
       res.status(404).json({ error: 'Model package not available' })
       return
     }
-    const filename = `model-${id}.tar.gz`
+    const filename = format === 'gltf' ? `model-${id}-gltf.tar.gz` : `model-${id}.tar.gz`
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.type('application/gzip').send(buffer)
   } catch (err) {

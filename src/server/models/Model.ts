@@ -19,6 +19,7 @@ const Model = sequelize.define(
     notes: { type: DataTypes.TEXT, field: 'mo_notes' },
     thumbfile: { type: DataTypes.TEXT, field: 'mo_thumbfile' },
     modelfile: { type: DataTypes.TEXT, field: 'mo_modelfile', allowNull: false },
+    gltfModelfile: { type: DataTypes.TEXT, field: 'mo_gltf_modelfile', allowNull: true },
     shared: { type: DataTypes.INTEGER, field: 'mo_shared' },
     modifiedBy: { type: DataTypes.INTEGER, field: 'mo_modified_by' },
     deleted: { type: DataTypes.DATE, field: 'mo_deleted', allowNull: true },

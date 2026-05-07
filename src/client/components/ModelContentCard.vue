@@ -1,29 +1,61 @@
 <template>
-  <Panel header="Model content" :class="{ 'model-content-card': true, 'model-content-card--compact': compact }">
+  <Panel :header="headerTitle" :class="{ 'model-content-card': true, 'model-content-card--compact': compact }">
     <div class="model-content-row">
       <div v-if="hasModelId" class="model-content-preview">
-        <div v-if="previewLoading" class="preview-placeholder">
-          <i class="pi pi-spin pi-spinner"></i> 3D…
-        </div>
-        <ModelViewer3d
-          v-else-if="previewData"
-          :preview-data="previewData"
-          :width="previewWidth"
-          :height="previewHeight"
-        />
-        <p v-else class="preview-unavailable text-color-secondary m-0">No 3D preview</p>
+        <template v-if="isGltfFormat">
+          <div v-if="filesLoading" class="preview-placeholder">
+            <i class="pi pi-spin pi-spinner"></i> 3D…
+          </div>
+          <GltfViewer3d
+            v-else-if="gltfModelUrl"
+            :model-url="gltfModelUrl"
+            :resolve-file-url="fileDownloadUrl"
+            :width="previewWidth"
+            :height="previewHeight"
+            aria-label="glTF model preview"
+          />
+          <p v-else class="preview-unavailable text-color-secondary m-0">No 3D preview</p>
+        </template>
+        <template v-else>
+          <div v-if="showPreview && previewLoading" class="preview-placeholder">
+            <i class="pi pi-spin pi-spinner"></i> 3D…
+          </div>
+          <ModelViewer3d
+            v-else-if="showPreview && previewData"
+            :preview-data="previewData"
+            :width="previewWidth"
+            :height="previewHeight"
+          />
+          <p v-else class="preview-unavailable text-color-secondary m-0">No 3D preview</p>
+        </template>
       </div>
       <div v-else-if="requestSig" class="model-content-preview">
-        <div v-if="requestPreviewLoading" class="preview-placeholder">
-          <i class="pi pi-spin pi-spinner"></i> 3D…
-        </div>
-        <ModelViewer3d
-          v-else-if="previewData"
-          :preview-data="previewData"
-          :width="previewWidth"
-          :height="previewHeight"
-        />
-        <p v-else class="preview-unavailable text-color-secondary m-0">No 3D preview</p>
+        <template v-if="isGltfFormat">
+          <div v-if="filesLoading" class="preview-placeholder">
+            <i class="pi pi-spin pi-spinner"></i> 3D…
+          </div>
+          <GltfViewer3d
+            v-else-if="gltfModelUrl"
+            :model-url="gltfModelUrl"
+            :resolve-file-url="fileDownloadUrl"
+            :width="previewWidth"
+            :height="previewHeight"
+            aria-label="glTF submission preview"
+          />
+          <p v-else class="preview-unavailable text-color-secondary m-0">No 3D preview</p>
+        </template>
+        <template v-else>
+          <div v-if="requestPreviewLoading" class="preview-placeholder">
+            <i class="pi pi-spin pi-spinner"></i> 3D…
+          </div>
+          <ModelViewer3d
+            v-else-if="previewData"
+            :preview-data="previewData"
+            :width="previewWidth"
+            :height="previewHeight"
+          />
+          <p v-else class="preview-unavailable text-color-secondary m-0">No 3D preview</p>
+        </template>
       </div>
       <div v-else class="model-content-preview model-content-pending">
         <p class="m-0 text-color-secondary">Preview not available (model not yet in database)</p>
@@ -85,6 +117,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import Panel from 'primevue/panel'
 import ModelViewer3d from '@/components/ModelViewer3d.vue'
+import GltfViewer3d from '@/components/GltfViewer3d.vue'
 import TextureFilenameCell from '@/components/TextureFilenameCell.vue'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -92,6 +125,7 @@ import {
   probeRasterImageDimensions,
   formatTextureDimensions,
 } from '@/utils/textureFileMeta'
+import { pickPrimaryGltfFilename } from '@/utils/gltfPreview'
 
 const auth = useAuthStore()
 
@@ -102,8 +136,9 @@ const props = withDefaults(
     requestSig?: string | null
     filename?: string | null
     compact?: boolean
+    format?: 'ac' | 'gltf'
   }>(),
-  { modelId: null, requestSig: null, filename: null, compact: false }
+  { modelId: null, requestSig: null, filename: null, compact: false, format: 'ac' }
 )
 
 const modelFiles = ref<{ name: string; size?: number }[]>([])
@@ -115,23 +150,39 @@ const previewLoading = ref(false)
 const requestPreviewLoading = ref(false)
 
 const hasModelId = computed(() => props.modelId != null && Number.isFinite(Number(props.modelId)))
+const isGltfFormat = computed(() => props.format === 'gltf')
+const showPreview = computed(() => !isGltfFormat.value)
+const headerTitle = computed(() => (isGltfFormat.value ? 'Model content (glTF)' : 'Model content'))
 
 const previewWidth = computed(() => (props.compact ? 180 : 240))
 const previewHeight = computed(() => (props.compact ? 135 : 180))
 
+const gltfPrimaryName = computed(() =>
+  isGltfFormat.value ? pickPrimaryGltfFilename(modelFiles.value) : null
+)
+const gltfModelUrl = computed(() => {
+  const name = gltfPrimaryName.value
+  if (!name) return ''
+  return fileDownloadUrl(name)
+})
+
 const packageDownloadUrl = computed(() => {
   if (hasModelId.value && props.modelId != null) {
-    return auth.apiUrl(`/api/models/${props.modelId}/package`)
+    const q = isGltfFormat.value ? '?format=gltf' : ''
+    return auth.apiUrl(`/api/models/${props.modelId}/package${q}`)
   }
   if (props.requestSig) {
-    return auth.apiUrl(`/api/position-requests/${encodeURIComponent(props.requestSig)}/package`)
+    const q = isGltfFormat.value ? '?format=gltf' : ''
+    return auth.apiUrl(`/api/position-requests/${encodeURIComponent(props.requestSig)}/package${q}`)
   }
   return '#'
 })
 
 function fileDownloadUrl(name: string) {
   if (!name) return '#'
-  const q = `?name=${encodeURIComponent(name)}`
+  const params = new URLSearchParams({ name })
+  if (isGltfFormat.value) params.set('format', 'gltf')
+  const q = `?${params.toString()}`
   if (hasModelId.value && props.modelId != null) {
     return auth.apiUrl(`/api/models/${props.modelId}/file${q}`)
   }
@@ -160,7 +211,8 @@ async function fetchFiles() {
   filesLoading.value = true
   modelFiles.value = []
   try {
-    const res = await fetch(auth.apiUrl(`/api/models/${id}/files`), { credentials: 'include' })
+    const q = isGltfFormat.value ? '?format=gltf' : ''
+    const res = await fetch(auth.apiUrl(`/api/models/${id}/files${q}`), { credentials: 'include' })
     if (res.ok) {
       const data = await res.json()
       modelFiles.value = data.files || []
@@ -196,7 +248,8 @@ async function fetchRequestPreview() {
   previewData.value = null
   requestPreviewLoading.value = true
   try {
-    const res = await fetch(auth.apiUrl(`/api/position-requests/${encodeURIComponent(sig)}/model-preview`), {
+    const q = isGltfFormat.value ? '?format=gltf' : ''
+    const res = await fetch(auth.apiUrl(`/api/position-requests/${encodeURIComponent(sig)}/model-preview${q}`), {
       credentials: 'include',
     })
     if (res.ok) {
@@ -216,7 +269,8 @@ async function fetchRequestFiles() {
   filesLoading.value = true
   modelFiles.value = []
   try {
-    const res = await fetch(auth.apiUrl(`/api/position-requests/${encodeURIComponent(sig)}/model-files`), {
+    const q = isGltfFormat.value ? '?format=gltf' : ''
+    const res = await fetch(auth.apiUrl(`/api/position-requests/${encodeURIComponent(sig)}/model-files${q}`), {
       credentials: 'include',
     })
     if (res.ok) {
@@ -233,11 +287,21 @@ async function fetchRequestFiles() {
 function loadContent() {
   if (hasModelId.value) {
     fetchFiles()
-    fetchPreview()
+    if (showPreview.value) {
+      fetchPreview()
+    } else {
+      previewData.value = null
+      previewLoading.value = false
+    }
     return
   }
   if (props.requestSig) {
-    fetchRequestPreview()
+    if (showPreview.value) {
+      fetchRequestPreview()
+    } else {
+      previewData.value = null
+      requestPreviewLoading.value = false
+    }
     fetchRequestFiles()
   }
 }

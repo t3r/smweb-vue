@@ -18,6 +18,9 @@ function runModelUploadMulter(req: Request, res: Response, next: NextFunction): 
     { name: 'ac3d', maxCount: 1 },
     { name: 'xml', maxCount: 1 },
     { name: 'png', maxCount: 12 },
+    { name: 'gltf', maxCount: 1 },
+    { name: 'gltfXml', maxCount: 1 },
+    { name: 'gltfAsset', maxCount: 24 },
   ])(req, res, (err: unknown) => {
     if (err instanceof MulterError && err.code === 'LIMIT_FILE_SIZE') {
       res.status(400).json({ error: 'Each uploaded file must be at most 2 MB.' })

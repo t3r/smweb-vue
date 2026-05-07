@@ -14,7 +14,7 @@ export const REQUEST_TYPES = {
   MODEL_DELETE: 'MODEL_DELETE',
 } as const
 
-const MODEL_FILE_KEYS = ['thumbnail', 'modelfiles', 'modelfile']
+const MODEL_FILE_KEYS = ['thumbnail', 'modelfiles', 'modelfile', 'gltfModelfiles', 'gltfModelfile']
 
 /** Safe overview for emails / API (no large base64 blobs). */
 export function getRequestContentOverview(type: string, content: unknown): unknown {
@@ -63,8 +63,14 @@ function contentOverview(type: string, content: unknown): unknown {
       const c = content as Record<string, unknown>
       const out: Record<string, unknown> = {}
       if (c.model && typeof c.model === 'object') {
-        out.model = { ...(c.model as object) }
-        MODEL_FILE_KEYS.forEach((k) => delete (out.model as Record<string, unknown>)[k])
+        const model = { ...(c.model as Record<string, unknown>) }
+        const hasGltf = !!(
+          (typeof model.gltfModelfiles === 'string' && model.gltfModelfiles.trim() !== '') ||
+          (typeof model.gltfModelfile === 'string' && model.gltfModelfile.trim() !== '')
+        )
+        MODEL_FILE_KEYS.forEach((k) => delete model[k])
+        model.hasGltf = hasGltf
+        out.model = model
       }
       if (c.object && typeof c.object === 'object') out.object = { ...(c.object as object) }
       if (c.author && typeof c.author === 'object') out.author = { ...(c.author as object) }
@@ -72,7 +78,12 @@ function contentOverview(type: string, content: unknown): unknown {
     }
     case 'MODEL_UPDATE': {
       const out = { ...(content as Record<string, unknown>) }
+      const hasGltf = !!(
+        (typeof out.gltfModelfiles === 'string' && out.gltfModelfiles.trim() !== '') ||
+        (typeof out.gltfModelfile === 'string' && out.gltfModelfile.trim() !== '')
+      )
       MODEL_FILE_KEYS.forEach((k) => delete out[k])
+      out.hasGltf = hasGltf
       return Object.keys(out).length ? out : null
     }
     case 'MODEL_DELETE': {

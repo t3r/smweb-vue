@@ -6,6 +6,7 @@ import { cache, cacheTtlSeconds } from '../config/cache.js'
 import * as objectRepo from './objectRepository.js'
 
 const CACHE_KEY_MODELFILE = (id: number): string => `model:modelfile:${id}`
+const CACHE_KEY_MODELFILE_GLTF = (id: number): string => `model:gltfmodelfile:${id}`
 
 const SORT_FIELDS = ['id', 'name', 'lastUpdated', 'group', 'author']
 
@@ -135,6 +136,23 @@ export async function findModelfileBase64ById(id: number): Promise<string | null
   return value
 }
 
+export async function findGltfModelfileBase64ById(id: number): Promise<string | null> {
+  const key = CACHE_KEY_MODELFILE_GLTF(id)
+  if (cacheTtlSeconds > 0) {
+    const cached = cache.get<string>(key)
+    if (cached !== undefined) return cached
+  }
+  const row = await Model.findOne({
+    where: { id: Number(id), ...notDeletedWhere },
+    attributes: ['gltfModelfile'],
+    raw: true,
+  }) as { gltfModelfile?: string | null } | null
+  const raw = row?.gltfModelfile
+  const value = raw != null && String(raw).trim() !== '' ? String(raw) : null
+  if (cacheTtlSeconds > 0 && value != null) cache.set(key, value, cacheTtlSeconds)
+  return value
+}
+
 export async function findThumbnailById(id: number): Promise<{ buffer: Buffer } | null> {
   const row = await Model.findOne({
     where: { id: Number(id), ...notDeletedWhere },
@@ -165,12 +183,23 @@ export interface InsertModelData {
   notes?: string
   thumbfileBase64?: string
   modelfileBase64: string
+  gltfModelfileBase64?: string | null
   shared: number
   modifiedBy?: number
 }
 
 export async function insertOne(data: InsertModelData): Promise<{ id: number }> {
-  const { path, authorId, name, notes, thumbfileBase64, modelfileBase64, shared, modifiedBy } = data
+  const {
+    path,
+    authorId,
+    name,
+    notes,
+    thumbfileBase64,
+    modelfileBase64,
+    gltfModelfileBase64,
+    shared,
+    modifiedBy,
+  } = data
   const row = await Model.create({
     path,
     authorId: Number(authorId),
@@ -178,6 +207,7 @@ export async function insertOne(data: InsertModelData): Promise<{ id: number }> 
     notes: notes || '',
     thumbfile: thumbfileBase64 || null,
     modelfile: modelfileBase64,
+    gltfModelfile: gltfModelfileBase64 != null ? gltfModelfileBase64 : null,
     shared: Number(shared),
     modifiedBy: modifiedBy != null ? Number(modifiedBy) : undefined,
   })
@@ -191,13 +221,24 @@ export interface UpdateModelData {
   notes?: string
   thumbfileBase64?: string
   modelfileBase64?: string
+  gltfModelfileBase64?: string | null
   shared?: number
   modifiedBy?: number
 }
 
 export async function updateOne(id: number, data: UpdateModelData): Promise<void> {
   const numId = Number(id)
-  const { path, authorId, name, notes, thumbfileBase64, modelfileBase64, shared, modifiedBy } = data
+  const {
+    path,
+    authorId,
+    name,
+    notes,
+    thumbfileBase64,
+    modelfileBase64,
+    gltfModelfileBase64,
+    shared,
+    modifiedBy,
+  } = data
   await Model.update(
     {
       path,
@@ -206,12 +247,18 @@ export async function updateOne(id: number, data: UpdateModelData): Promise<void
       notes: notes != null ? notes : undefined,
       thumbfile: thumbfileBase64 != null ? thumbfileBase64 : undefined,
       modelfile: modelfileBase64 != null ? modelfileBase64 : undefined,
+      gltfModelfile: Object.prototype.hasOwnProperty.call(data, 'gltfModelfileBase64')
+        ? (gltfModelfileBase64 ?? null)
+        : undefined,
       shared: shared != null ? Number(shared) : undefined,
       modifiedBy: modifiedBy != null ? Number(modifiedBy) : undefined,
     },
     { where: { id: numId } }
   )
-  if (cacheTtlSeconds > 0) cache.del(CACHE_KEY_MODELFILE(numId))
+  if (cacheTtlSeconds > 0) {
+    cache.del(CACHE_KEY_MODELFILE(numId))
+    cache.del(CACHE_KEY_MODELFILE_GLTF(numId))
+  }
 }
 
 export async function deleteOne(id: number, modifiedBy?: number): Promise<void> {
@@ -227,5 +274,8 @@ export async function deleteOne(id: number, modifiedBy?: number): Promise<void> 
     },
     { where: { id: numId } }
   )
-  if (cacheTtlSeconds > 0) cache.del(CACHE_KEY_MODELFILE(numId))
+  if (cacheTtlSeconds > 0) {
+    cache.del(CACHE_KEY_MODELFILE(numId))
+    cache.del(CACHE_KEY_MODELFILE_GLTF(numId))
+  }
 }

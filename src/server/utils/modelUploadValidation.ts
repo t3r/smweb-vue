@@ -19,6 +19,7 @@ export const MODEL_UPLOAD_MAX_FILE_BYTES = 2_000_000
 const RE_AC3D_FILENAME = /^[a-zA-Z0-9_.-]+\.(ac|AC)$/u
 const RE_XML_FILENAME = /^[a-zA-Z0-9_.-]+\.(xml|XML)$/u
 const RE_PNG_FILENAME = /^[a-zA-Z0-9_.-]+\.(png|PNG)$/u
+const RE_GLTF_FILENAME = /^[a-zA-Z0-9_.-]+\.(gltf|GLTF|glb|GLB)$/u
 const RE_LONG_LAT = /^[-+]?([0-9]*\.[0-9]+|[0-9]+)$/u
 const RE_EMAIL = /^[0-9a-zA-Z_.-]+@[0-9a-z_-]+\.[0-9a-zA-Z_.-]+$/u
 const RE_MODEL_GROUP_ID = /^[0-9]+$/
@@ -27,6 +28,7 @@ const RE_AUTHOR_ID = /^[0-9]{1,3}$/
 const XML_DECL_RE = /^<\?xml\s+version="1\.0"\s+encoding="UTF-8"\s*\?>/i
 /** Disallow DTD: mitigates DoS from huge internal subsets; external SYSTEM is unsupported by the parser but we reject explicitly. */
 const DOCTYPE_RE = /<!DOCTYPE[\s\[]/i
+const CANONICAL_XML_DECL = '<?xml version="1.0" encoding="UTF-8" ?>'
 
 /**
  * Safe defaults for untrusted model XML (uploads). Entity expansion off; no network/file resolution.
@@ -53,6 +55,21 @@ export function normalizeTextFileBuffer(buf: Buffer): Buffer {
   let s = stripUtf8Bom(buf).toString('utf8')
   s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   return Buffer.from(s, 'utf8')
+}
+
+/**
+ * Auto-fix XML declaration spelling/case and insert it if missing.
+ */
+export function normalizeModelXmlBuffer(buf: Buffer): Buffer {
+  const normalized = normalizeTextFileBuffer(buf).toString('utf8')
+  const trimmedStart = normalized.trimStart()
+  if (!trimmedStart) return Buffer.from(`${CANONICAL_XML_DECL}\n`, 'utf8')
+
+  const xmlDeclAnyCase = /^<\?xml\b[^?]*\?>/i
+  const out = xmlDeclAnyCase.test(trimmedStart)
+    ? trimmedStart.replace(xmlDeclAnyCase, CANONICAL_XML_DECL)
+    : `${CANONICAL_XML_DECL}\n${trimmedStart}`
+  return Buffer.from(out, 'utf8')
 }
 
 /** Reject path separators and traversal in upload names; name must be a single flat segment. */
@@ -462,8 +479,119 @@ export async function validateModelfileBase64Package(
   return validateModelFileBuffers({
     acBuffer: normalizeTextFileBuffer(ac.buffer),
     acFilename: ac.name,
-    xmlBuffer: xml ? normalizeTextFileBuffer(xml.buffer) : null,
+    xmlBuffer: xml ? normalizeModelXmlBuffer(xml.buffer) : null,
     xmlFilename: xml?.name ?? null,
     pngFiles: pngEntries,
   })
+}
+
+function decodeSafeGltfUri(uri: string): string | null {
+  const trimmed = String(uri || '').trim()
+  if (!trimmed || trimmed.startsWith('data:')) return null
+  try {
+    return decodeURIComponent(trimmed)
+  } catch {
+    return null
+  }
+}
+
+function validateGltfJsonRefs(
+  primaryName: string,
+  primaryBuffer: Buffer,
+  namesInArchive: Set<string>
+): string | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(stripUtf8Bom(primaryBuffer).toString('utf8'))
+  } catch {
+    return `glTF file "${primaryName}" is not valid JSON.`
+  }
+  const gltf = parsed as {
+    buffers?: { uri?: unknown }[]
+    images?: { uri?: unknown }[]
+  } | null
+  const uris: string[] = []
+  for (const b of gltf?.buffers ?? []) {
+    if (typeof b?.uri === 'string') uris.push(b.uri)
+  }
+  for (const i of gltf?.images ?? []) {
+    if (typeof i?.uri === 'string') uris.push(i.uri)
+  }
+  for (const rawUri of uris) {
+    const decoded = decodeSafeGltfUri(rawUri)
+    if (!decoded) continue
+    const flat = assertFlatUploadFilename(decoded)
+    if (!flat) {
+      return `glTF URI "${rawUri}" must reference a flat local filename inside the archive.`
+    }
+    if (!namesInArchive.has(flat)) {
+      return `glTF references "${flat}" but that file is missing from the glTF package.`
+    }
+  }
+  return null
+}
+
+export async function validateGltfModelfileBase64Package(
+  gltfModelfileBase64: string,
+  expectedMoPath: string
+): Promise<string | null> {
+  let buffer: Buffer
+  try {
+    buffer = Buffer.from(gltfModelfileBase64, 'base64')
+  } catch {
+    return 'glTF package is not valid base64.'
+  }
+  const map = extractTarToMap(buffer)
+  if (map.size === 0) {
+    return 'glTF package is empty, not a valid gzip/tar archive, or exceeds safe decompression size limits.'
+  }
+
+  const primaryEntries: { name: string; buffer: Buffer }[] = []
+  const xmlEntries: { name: string; buffer: Buffer }[] = []
+  const namesInArchive = new Set<string>()
+
+  for (const [name, buf] of map) {
+    const flat = assertFlatUploadFilename(name)
+    if (!flat) return `Invalid file name in glTF archive: "${name}".`
+    const sizeErr = assertFileSizeUnderLimit(buf.length, `Archive file "${flat}"`)
+    if (sizeErr) return sizeErr
+    namesInArchive.add(flat)
+    const lower = flat.toLowerCase()
+    if (lower.endsWith('.gltf') || lower.endsWith('.glb')) primaryEntries.push({ name: flat, buffer: buf })
+    else if (lower.endsWith('.xml')) xmlEntries.push({ name: flat, buffer: buf })
+  }
+
+  if (primaryEntries.length !== 1) {
+    return 'glTF package must contain exactly one primary .gltf or .glb file.'
+  }
+  const primary = primaryEntries[0]!
+  if (!RE_GLTF_FILENAME.test(primary.name)) {
+    return 'glTF primary filename must be *.gltf or *.glb using only letters, digits, \'_\', \'.\', or \'-\'.'
+  }
+  if (xmlEntries.length > 1) {
+    return 'glTF package must contain at most one .xml file.'
+  }
+  const xml = xmlEntries[0] ?? null
+
+  const pathFlat = assertFlatUploadFilename(expectedMoPath)
+  if (!pathFlat) return 'Model filename (path) is invalid.'
+  if (xml && pathFlat !== xml.name) {
+    return `glTF XML filename must match model path ("${pathFlat}").`
+  }
+
+  if (primary.name.toLowerCase().endsWith('.gltf')) {
+    const refErr = validateGltfJsonRefs(primary.name, primary.buffer, namesInArchive)
+    if (refErr) return refErr
+  }
+
+  if (xml) {
+    const xmlStr = normalizeModelXmlBuffer(xml.buffer).toString('utf8')
+    const pathResult = readXmlPathElement(xmlStr)
+    if (pathResult.ok === false) return pathResult.error
+    if (pathResult.path !== primary.name) {
+      return `The <path> in glTF XML must be "${primary.name}" (the glTF filename); found "${pathResult.path}".`
+    }
+  }
+
+  return null
 }

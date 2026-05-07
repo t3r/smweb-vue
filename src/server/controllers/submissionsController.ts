@@ -15,10 +15,12 @@ import {
   assertFlatUploadFilename,
   assertModelPathAvailable,
   assertModelPathForUpdate,
+  normalizeModelXmlBuffer,
   normalizeTextFileBuffer,
   validateAc3dXmlPngNames,
   validateModelAddFormFields,
   validateModelFileBuffers,
+  validateGltfModelfileBase64Package,
   validateModelUpdateFormFields,
   validateModelfileBase64Package,
   validateThumbnailBase64Input,
@@ -475,6 +477,9 @@ export const MODEL_UPLOAD_FIELDS = [
   { name: 'ac3d', maxCount: 1 },
   { name: 'xml', maxCount: 1 },
   { name: 'png', maxCount: 12 },
+  { name: 'gltf', maxCount: 1 },
+  { name: 'gltfXml', maxCount: 1 },
+  { name: 'gltfAsset', maxCount: 24 },
 ] as const
 
 export async function submitModelUpload(req: Request, res: Response): Promise<void> {
@@ -485,6 +490,9 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
     const ac3dFiles = files.ac3d
     const xmlFiles = files.xml
     const pngFiles = files.png
+    const gltfFiles = files.gltf
+    const gltfXmlFiles = files.gltfXml
+    const gltfAssetFiles = files.gltfAsset
 
     if (!thumbnailFiles?.length || !thumbnailFiles[0]?.buffer) {
       res.status(400).json({ error: 'thumbnail file is required' })
@@ -625,7 +633,7 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
     const countryCode = await countryService.resolveCountryCodeAt(lon, lat)
 
     const acNorm = normalizeTextFileBuffer(ac3d.buffer)
-    const xmlNorm = xmlFile?.buffer ? normalizeTextFileBuffer(xmlFile.buffer) : null
+    const xmlNorm = xmlFile?.buffer ? normalizeModelXmlBuffer(xmlFile.buffer) : null
     const fileErr = await validateModelFileBuffers({
       acBuffer: acNorm,
       acFilename: acFlat,
@@ -653,9 +661,96 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
     const tarEntries: { name: string; buffer: Buffer }[] = [{ name: acFlat, buffer: acNorm }]
     if (xmlFlat && xmlNorm) tarEntries.push({ name: xmlFlat, buffer: xmlNorm })
     for (const p of pngBuffers) tarEntries.push({ name: p.name, buffer: p.buffer })
-
     const modelfileGzip = await buildTarGz(tarEntries)
     const modelfileBase64 = modelfileGzip.toString('base64')
+    let gltfModelfileBase64: string | null = null
+    const hasAnyGltfUpload = !!(
+      (gltfFiles && gltfFiles.length > 0) ||
+      (gltfXmlFiles && gltfXmlFiles.length > 0) ||
+      (gltfAssetFiles && gltfAssetFiles.length > 0)
+    )
+    if (hasAnyGltfUpload) {
+      if (!gltfFiles?.length || !gltfFiles[0]?.buffer) {
+        res.status(400).json({ error: 'glTF primary file (.gltf or .glb) is required when uploading glTF package content.' })
+        return
+      }
+      const gltfPrimary = gltfFiles[0]!
+      err = assertFileSizeUnderLimit(gltfPrimary.size, 'glTF file')
+      if (err) {
+        res.status(400).json({ error: err })
+        return
+      }
+      const gltfPrimaryName = assertFlatUploadFilename(gltfPrimary.originalname)
+      if (!gltfPrimaryName) {
+        res.status(400).json({ error: 'Invalid glTF primary file name.' })
+        return
+      }
+      const gltfPrimaryLower = gltfPrimaryName.toLowerCase()
+      if (!(gltfPrimaryLower.endsWith('.gltf') || gltfPrimaryLower.endsWith('.glb'))) {
+        res.status(400).json({ error: 'glTF primary file must be .gltf or .glb.' })
+        return
+      }
+      let gltfXmlName: string | null = null
+      let gltfXmlBuffer: Buffer | null = null
+      if (gltfXmlFiles?.[0]?.buffer) {
+        const gltfXml = gltfXmlFiles[0]!
+        err = assertFileSizeUnderLimit(gltfXml.size, 'glTF XML file')
+        if (err) {
+          res.status(400).json({ error: err })
+          return
+        }
+        const xf = assertFlatUploadFilename(gltfXml.originalname)
+        if (!xf) {
+          res.status(400).json({ error: 'Invalid glTF XML file name.' })
+          return
+        }
+        gltfXmlName = xf
+        gltfXmlBuffer = normalizeModelXmlBuffer(gltfXml.buffer)
+      }
+      const gltfEntries: { name: string; buffer: Buffer }[] = [{
+        name: gltfPrimaryName,
+        buffer: gltfPrimaryLower.endsWith('.gltf')
+          ? normalizeTextFileBuffer(gltfPrimary.buffer)
+          : gltfPrimary.buffer,
+      }]
+      const gltfNames = new Set<string>([gltfPrimaryName])
+      if (gltfXmlName && gltfXmlBuffer) {
+        if (gltfNames.has(gltfXmlName)) {
+          res.status(400).json({ error: `Duplicate file name in glTF upload: "${gltfXmlName}".` })
+          return
+        }
+        gltfEntries.push({ name: gltfXmlName, buffer: gltfXmlBuffer })
+        gltfNames.add(gltfXmlName)
+      }
+      if (gltfAssetFiles?.length) {
+        for (const f of gltfAssetFiles) {
+          if (!f?.buffer) continue
+          err = assertFileSizeUnderLimit(f.size, `glTF asset "${f.originalname}"`)
+          if (err) {
+            res.status(400).json({ error: err })
+            return
+          }
+          const assetName = assertFlatUploadFilename(f.originalname)
+          if (!assetName) {
+            res.status(400).json({ error: `Invalid glTF asset file name: "${f.originalname}".` })
+            return
+          }
+          if (gltfNames.has(assetName)) {
+            res.status(400).json({ error: `Duplicate file name in glTF upload: "${assetName}".` })
+            return
+          }
+          gltfEntries.push({ name: assetName, buffer: f.buffer })
+          gltfNames.add(assetName)
+        }
+      }
+      const gltfTar = await buildTarGz(gltfEntries)
+      gltfModelfileBase64 = gltfTar.toString('base64')
+      const gltfErr = await validateGltfModelfileBase64Package(gltfModelfileBase64, pathToUse)
+      if (gltfErr) {
+        res.status(400).json({ error: gltfErr })
+        return
+      }
+    }
 
     const modelPayload = {
       filename: pathToUse,
@@ -664,6 +759,7 @@ export async function submitModelUpload(req: Request, res: Response): Promise<vo
       description: String(body.description || '').trim(),
       thumbnail: thumbnailBase64,
       modelfiles: modelfileBase64,
+      gltfModelfiles: gltfModelfileBase64,
       modelgroup: body.groupId != null ? Number(body.groupId) : 1,
     }
     const objectPayload = {
@@ -780,6 +876,9 @@ export async function submitModelUpdateUpload(req: Request, res: Response): Prom
     const ac3dFiles = files.ac3d
     const xmlFiles = files.xml
     const pngFiles = files.png
+    const gltfFiles = files.gltf
+    const gltfXmlFiles = files.gltfXml
+    const gltfAssetFiles = files.gltfAsset
 
     if (ac3dFiles?.length && ac3dFiles[0]?.buffer) {
       const ac3d = ac3dFiles[0]!
@@ -810,7 +909,7 @@ export async function submitModelUpdateUpload(req: Request, res: Response): Prom
         return
       }
       deleteTarKeysMatching((k) => k.toLowerCase().endsWith('.xml'))
-      fileMap.set(xf, normalizeTextFileBuffer(xmlFile.buffer))
+      fileMap.set(xf, normalizeModelXmlBuffer(xmlFile.buffer))
     }
 
     if (pngFiles?.length) {
@@ -879,7 +978,7 @@ export async function submitModelUpdateUpload(req: Request, res: Response): Prom
     }
 
     const acNorm = normalizeTextFileBuffer(acBuffer)
-    const xmlNorm = xmlBufferInMap ? normalizeTextFileBuffer(xmlBufferInMap) : null
+    const xmlNorm = xmlBufferInMap ? normalizeModelXmlBuffer(xmlBufferInMap) : null
     const fileErr = await validateModelFileBuffers({
       acBuffer: acNorm,
       acFilename: acName,
@@ -902,6 +1001,95 @@ export async function submitModelUpdateUpload(req: Request, res: Response): Prom
 
     const modelfileGzip = await buildTarGz(tarEntries)
     const modelfileBase64 = modelfileGzip.toString('base64')
+    const existingGltfModelfileB64 = await modelRepo.findGltfModelfileBase64ById(modelId)
+    let gltfModelfileBase64: string | null = existingGltfModelfileB64
+    const hasAnyGltfUpload = !!(
+      (gltfFiles && gltfFiles.length > 0) ||
+      (gltfXmlFiles && gltfXmlFiles.length > 0) ||
+      (gltfAssetFiles && gltfAssetFiles.length > 0)
+    )
+    if (hasAnyGltfUpload) {
+      if (!gltfFiles?.length || !gltfFiles[0]?.buffer) {
+        res.status(400).json({ error: 'glTF primary file (.gltf or .glb) is required when updating glTF package content.' })
+        return
+      }
+      const gltfPrimary = gltfFiles[0]!
+      let err = assertFileSizeUnderLimit(gltfPrimary.size, 'glTF file')
+      if (err) {
+        res.status(400).json({ error: err })
+        return
+      }
+      const gltfPrimaryName = assertFlatUploadFilename(gltfPrimary.originalname)
+      if (!gltfPrimaryName) {
+        res.status(400).json({ error: 'Invalid glTF primary file name.' })
+        return
+      }
+      const gltfPrimaryLower = gltfPrimaryName.toLowerCase()
+      if (!(gltfPrimaryLower.endsWith('.gltf') || gltfPrimaryLower.endsWith('.glb'))) {
+        res.status(400).json({ error: 'glTF primary file must be .gltf or .glb.' })
+        return
+      }
+      let gltfXmlName: string | null = null
+      let gltfXmlBuffer: Buffer | null = null
+      if (gltfXmlFiles?.[0]?.buffer) {
+        const gltfXml = gltfXmlFiles[0]!
+        err = assertFileSizeUnderLimit(gltfXml.size, 'glTF XML file')
+        if (err) {
+          res.status(400).json({ error: err })
+          return
+        }
+        const xf = assertFlatUploadFilename(gltfXml.originalname)
+        if (!xf) {
+          res.status(400).json({ error: 'Invalid glTF XML file name.' })
+          return
+        }
+        gltfXmlName = xf
+        gltfXmlBuffer = normalizeModelXmlBuffer(gltfXml.buffer)
+      }
+      const gltfEntries: { name: string; buffer: Buffer }[] = [{
+        name: gltfPrimaryName,
+        buffer: gltfPrimaryLower.endsWith('.gltf')
+          ? normalizeTextFileBuffer(gltfPrimary.buffer)
+          : gltfPrimary.buffer,
+      }]
+      const gltfNames = new Set<string>([gltfPrimaryName])
+      if (gltfXmlName && gltfXmlBuffer) {
+        if (gltfNames.has(gltfXmlName)) {
+          res.status(400).json({ error: `Duplicate file name in glTF upload: "${gltfXmlName}".` })
+          return
+        }
+        gltfEntries.push({ name: gltfXmlName, buffer: gltfXmlBuffer })
+        gltfNames.add(gltfXmlName)
+      }
+      if (gltfAssetFiles?.length) {
+        for (const f of gltfAssetFiles) {
+          if (!f?.buffer) continue
+          err = assertFileSizeUnderLimit(f.size, `glTF asset "${f.originalname}"`)
+          if (err) {
+            res.status(400).json({ error: err })
+            return
+          }
+          const assetName = assertFlatUploadFilename(f.originalname)
+          if (!assetName) {
+            res.status(400).json({ error: `Invalid glTF asset file name: "${f.originalname}".` })
+            return
+          }
+          if (gltfNames.has(assetName)) {
+            res.status(400).json({ error: `Duplicate file name in glTF upload: "${assetName}".` })
+            return
+          }
+          gltfEntries.push({ name: assetName, buffer: f.buffer })
+          gltfNames.add(assetName)
+        }
+      }
+      const gltfTar = await buildTarGz(gltfEntries)
+      gltfModelfileBase64 = gltfTar.toString('base64')
+      const gltfErr = await validateGltfModelfileBase64Package(gltfModelfileBase64, pathToUse)
+      if (gltfErr) {
+        res.status(400).json({ error: gltfErr })
+        return
+      }
+    }
 
     let thumbnailBase64: string
     if (thumbnailFiles?.length && thumbnailFiles[0]?.buffer) {
@@ -989,6 +1177,7 @@ export async function submitModelUpdateUpload(req: Request, res: Response): Prom
       description: String(body.description || '').trim(),
       thumbnail: thumbnailBase64,
       modelfiles: modelfileBase64,
+      gltfModelfiles: gltfModelfileBase64,
       modelgroup: body.groupId != null ? Number(body.groupId) : Number(modelRow.groupId),
     }
 

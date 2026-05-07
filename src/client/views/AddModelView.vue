@@ -170,6 +170,61 @@
                   </div>
                 </section>
 
+                <section class="form-section form-section-gltf" aria-labelledby="add-model-section-gltf">
+                  <h2 id="add-model-section-gltf" class="form-section-title">
+                    glTF package
+                    <span class="optional-file-hint">(optional, experimental)</span>
+                  </h2>
+                  <p class="section-hint">
+                    Upload a second model package for glTF. This is separate from the mandatory AC3D package above.
+                  </p>
+                  <ul class="help-list-compact">
+                    <li>Primary file: one <code>.gltf</code> or <code>.glb</code>.</li>
+                    <li>Optional XML can be included; if provided, the XML filename must match the model path filename.</li>
+                    <li>Add texture/buffer assets used by the glTF file (for example <code>.png</code>, <code>.jpg</code>, <code>.bin</code>).</li>
+                    <li v-if="isEditMode">Leave empty to keep the current glTF package unchanged.</li>
+                  </ul>
+                  <div class="field-pair">
+                    <div class="field">
+                      <label for="add-model-gltf-primary" class="field-label">
+                        glTF primary
+                        <span class="optional-file-hint">(optional)</span>
+                      </label>
+                      <div class="file-cell">
+                        <input
+                          id="add-model-gltf-primary"
+                          type="file"
+                          accept=".gltf,.glb,model/gltf+json,model/gltf-binary"
+                          @change="onGltfPrimaryChange"
+                        />
+                        <span class="file-name">{{ gltfPrimaryFileName || 'None' }}</span>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="add-model-gltf-xml" class="field-label">glTF XML (optional)</label>
+                      <div class="file-cell">
+                        <input
+                          id="add-model-gltf-xml"
+                          type="file"
+                          accept=".xml,text/xml,application/xml"
+                          @change="onGltfXmlChange"
+                        />
+                        <span class="file-name">{{ gltfXmlFileName || 'None' }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field mt-field">
+                    <label for="add-model-gltf-assets" class="field-label">glTF assets / textures</label>
+                    <div class="file-cell">
+                      <input id="add-model-gltf-assets" type="file" multiple @change="onGltfAssetsChange" />
+                      <span class="file-name">{{ gltfAssetsSummary }}</span>
+                    </div>
+                    <p v-if="isEditMode && existingHasGltf" class="file-hint m-0">
+                      A glTF package already exists. Uploading files here replaces it.
+                    </p>
+                  </div>
+                </section>
+
                 <section
                   v-if="isEditMode && packageFilesLoaded"
                   class="form-section"
@@ -433,6 +488,9 @@ const ac3dFile = ref<File | null>(null)
 const thumbFile = ref<File | null>(null)
 const xmlFile = ref<File | null>(null)
 const pngFiles = ref<File[]>([])
+const gltfPrimaryFile = ref<File | null>(null)
+const gltfXmlFile = ref<File | null>(null)
+const gltfAssetFiles = ref<File[]>([])
 
 const modelGroups = ref<{ id: number; name: string | null; path: string | null }[]>([])
 const authors = ref<{ id: number; name: string | null; email?: string | null }[]>([])
@@ -443,6 +501,7 @@ const existingPngEntries = ref<{ name: string; size: number }[]>([])
 const removeXmlFromPackage = ref(false)
 const removePngNames = ref<string[]>([])
 const routeBootstrapDone = ref(false)
+const existingHasGltf = ref(false)
 
 /** Snapshot after loading the model for edit — drives “changes from saved” comparison. */
 interface EditBaseline {
@@ -470,6 +529,12 @@ const xmlFileName = computed(() => xmlFile.value?.name ?? null)
 const pngFileSummary = computed(() => {
   const n = pngFiles.value.length
   return n === 0 ? 'None' : n === 1 ? pngFiles.value[0].name : `${n} files`
+})
+const gltfPrimaryFileName = computed(() => gltfPrimaryFile.value?.name ?? null)
+const gltfXmlFileName = computed(() => gltfXmlFile.value?.name ?? null)
+const gltfAssetsSummary = computed(() => {
+  const n = gltfAssetFiles.value.length
+  return n === 0 ? 'None' : n === 1 ? gltfAssetFiles.value[0].name : `${n} files`
 })
 
 function formatBaseline(s: string) {
@@ -640,6 +705,18 @@ function onPngChange(e: Event) {
   const input = e.target as HTMLInputElement
   pngFiles.value = input.files ? Array.from(input.files) : []
 }
+function onGltfPrimaryChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  gltfPrimaryFile.value = input.files?.[0] ?? null
+}
+function onGltfXmlChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  gltfXmlFile.value = input.files?.[0] ?? null
+}
+function onGltfAssetsChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  gltfAssetFiles.value = input.files ? Array.from(input.files) : []
+}
 function onAuthorChange() {
   if (form.value.authorId !== OTHER_AUTHOR_OPTION_VALUE) {
     form.value.authorName = ''
@@ -726,6 +803,7 @@ async function loadModelForEdit() {
   editBaseline.value = null
   clearError()
   packageFilesLoaded.value = false
+  existingHasGltf.value = false
   existingXmlName.value = null
   existingPngEntries.value = []
   removeXmlFromPackage.value = false
@@ -741,6 +819,7 @@ async function loadModelForEdit() {
       description?: string | null
       filename?: string | null
       groupId?: number
+      hasGltf?: boolean
       author?: { id?: number; name?: string | null } | null
     }
     form.value.name = (m.name && String(m.name).trim()) || ''
@@ -756,6 +835,7 @@ async function loadModelForEdit() {
     existingXmlName.value = xml?.name ?? null
     existingPngEntries.value = files.filter((f) => f.name.toLowerCase().endsWith('.png'))
     packageFilesLoaded.value = true
+    existingHasGltf.value = m.hasGltf === true
 
     applyLoggedInUserContactFields()
 
@@ -819,11 +899,17 @@ async function submit() {
       if (ac3dFile.value) fd.append('ac3d', ac3dFile.value)
       if (xmlFile.value) fd.append('xml', xmlFile.value)
       for (const f of pngFiles.value) fd.append('png', f)
+      if (gltfPrimaryFile.value) fd.append('gltf', gltfPrimaryFile.value)
+      if (gltfXmlFile.value) fd.append('gltfXml', gltfXmlFile.value)
+      for (const f of gltfAssetFiles.value) fd.append('gltfAsset', f)
     } else {
       fd.append('thumbnail', thumbFile.value!)
       fd.append('ac3d', ac3dFile.value!)
       if (xmlFile.value) fd.append('xml', xmlFile.value)
       for (const f of pngFiles.value) fd.append('png', f)
+      if (gltfPrimaryFile.value) fd.append('gltf', gltfPrimaryFile.value)
+      if (gltfXmlFile.value) fd.append('gltfXml', gltfXmlFile.value)
+      for (const f of gltfAssetFiles.value) fd.append('gltfAsset', f)
     }
 
     const res = await fetch(url, {
@@ -975,6 +1061,12 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+.form-section-gltf {
+  border: 1px dashed var(--p-surface-300);
+  border-radius: var(--p-border-radius, 6px);
+  padding: 0.85rem;
+  background: var(--p-surface-50, rgba(0, 0, 0, 0.02));
 }
 .form-section-title {
   margin: 0;

@@ -20,17 +20,33 @@ function isPendingPkgErr(r: PendingPkgLoad): r is PendingPkgErr {
 }
 
 /** Gzipped tarball base64: nested under `model` for MODEL_ADD, at content root for MODEL_UPDATE. */
-function modelfilesBase64FromContent(type: string, content: Record<string, unknown>): string | undefined {
+function modelfilesBase64FromContent(
+  type: string,
+  content: Record<string, unknown>,
+  format: 'ac' | 'gltf'
+): string | undefined {
+  const isGltf = format === 'gltf'
   if (type === 'MODEL_ADD') {
     const model = content.model as Record<string, unknown> | undefined
-    const b64 = (model?.modelfiles ?? model?.modelfile) as string | undefined
+    const b64 = (isGltf
+      ? (model?.gltfModelfiles ?? model?.gltfModelfile)
+      : (model?.modelfiles ?? model?.modelfile)) as string | undefined
     return typeof b64 === 'string' ? b64 : undefined
   }
   if (type === 'MODEL_UPDATE') {
-    const b64 = (content.modelfiles ?? content.modelfile) as string | undefined
+    const b64 = (isGltf
+      ? (content.gltfModelfiles ?? content.gltfModelfile)
+      : (content.modelfiles ?? content.modelfile)) as string | undefined
     return typeof b64 === 'string' ? b64 : undefined
   }
   return undefined
+}
+
+function parsePackageFormat(raw: unknown): 'ac' | 'gltf' | null {
+  if (raw == null || raw === '') return 'ac'
+  const v = String(raw).trim().toLowerCase()
+  if (v === 'ac' || v === 'gltf') return v
+  return null
 }
 
 /** Submission JPEG base64: under `model` for MODEL_ADD, at content root for MODEL_UPDATE. */
@@ -47,7 +63,7 @@ function thumbnailBase64FromContent(type: string, content: Record<string, unknow
   return undefined
 }
 
-async function loadPendingModelPackage(req: Request, sig: string): Promise<PendingPkgLoad> {
+async function loadPendingModelPackage(req: Request, sig: string, format: 'ac' | 'gltf' = 'ac'): Promise<PendingPkgLoad> {
   if (!sig || typeof sig !== 'string') {
     const err: PendingPkgErr = { ok: false, status: 400, error: 'Missing sig' }
     return err
@@ -79,9 +95,9 @@ async function loadPendingModelPackage(req: Request, sig: string): Promise<Pendi
     return err
   }
   const content = request.content as Record<string, unknown>
-  const modelfilesBase64 = modelfilesBase64FromContent(request.type, content)
+  const modelfilesBase64 = modelfilesBase64FromContent(request.type, content, format)
   if (!modelfilesBase64) {
-    const err: PendingPkgErr = { ok: false, status: 404, error: 'No model package in request' }
+    const err: PendingPkgErr = { ok: false, status: 404, error: `No ${format} model package in request` }
     return err
   }
   try {
@@ -173,8 +189,17 @@ export async function getBySig(req: Request, res: Response): Promise<void> {
 
 export async function getModelPreview(req: Request, res: Response): Promise<void> {
   try {
+    const format = parsePackageFormat(req.query.format)
+    if (format == null) {
+      res.status(400).json({ error: 'Invalid format query parameter (use ac or gltf)' })
+      return
+    }
+    if (format === 'gltf') {
+      res.status(404).json({ error: 'No AC3D preview for glTF package' })
+      return
+    }
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '', format)
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -194,8 +219,13 @@ export async function getModelPreview(req: Request, res: Response): Promise<void
 /** Tarball file listing for MODEL_ADD / MODEL_UPDATE review (same archive as model-preview). */
 export async function getRequestModelFiles(req: Request, res: Response): Promise<void> {
   try {
+    const format = parsePackageFormat(req.query.format)
+    if (format == null) {
+      res.status(400).json({ error: 'Invalid format query parameter (use ac or gltf)' })
+      return
+    }
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '', format)
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -211,9 +241,14 @@ export async function getRequestModelFiles(req: Request, res: Response): Promise
 /** Single file from pending MODEL_ADD / MODEL_UPDATE package (reviewer download). */
 export async function getRequestModelFile(req: Request, res: Response): Promise<void> {
   try {
+    const format = parsePackageFormat(req.query.format)
+    if (format == null) {
+      res.status(400).json({ error: 'Invalid format query parameter (use ac or gltf)' })
+      return
+    }
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
     const name = validateFileName(req.query.name)
-    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '', format)
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
@@ -240,14 +275,20 @@ export async function getRequestModelFile(req: Request, res: Response): Promise<
 /** Full .tar.gz for pending MODEL_ADD / MODEL_UPDATE (reviewer download). */
 export async function getRequestModelPackage(req: Request, res: Response): Promise<void> {
   try {
+    const format = parsePackageFormat(req.query.format)
+    if (format == null) {
+      res.status(400).json({ error: 'Invalid format query parameter (use ac or gltf)' })
+      return
+    }
     const sig = Array.isArray(req.params.sig) ? req.params.sig[0] : req.params.sig
-    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '')
+    const loaded = await loadPendingModelPackage(req, typeof sig === 'string' ? sig : '', format)
     if (isPendingPkgErr(loaded)) {
       res.status(loaded.status).json({ error: loaded.error })
       return
     }
     const safe = (typeof sig === 'string' ? sig : 'request').replace(/[^a-f0-9]/gi, '').slice(0, 12) || 'submission'
-    res.setHeader('Content-Disposition', `attachment; filename="model-${safe}.tar.gz"`)
+    const suffix = format === 'gltf' ? '-gltf' : ''
+    res.setHeader('Content-Disposition', `attachment; filename="model-${safe}${suffix}.tar.gz"`)
     res.type('application/gzip').send(loaded.buffer)
   } catch (err) {
     logDbError(err, 'GET /api/position-requests/:sig/package')
