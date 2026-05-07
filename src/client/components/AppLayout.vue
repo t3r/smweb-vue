@@ -100,12 +100,11 @@ const gitCommitUrl =
 
 const navItems = computed(() => {
   const items = [
-    { label: 'Home', command: () => router.push('/') },
-    { label: 'News', command: () => router.push('/news') },
     { label: 'Map', command: () => router.push('/map') },
     { label: 'Models', command: () => router.push('/models') },
     { label: 'Objects', command: () => router.push('/objects') },
     { label: 'Authors', command: () => router.push('/authors') },
+    { label: 'News', command: () => router.push('/news') },
     { label: 'About', command: () => router.push('/about') },
     { label: 'Help', command: () => router.push('/help') },
   ]
