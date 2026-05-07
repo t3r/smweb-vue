@@ -10,10 +10,19 @@ export const CLIENT_ERROR_MESSAGE = 'An error occurred'
  */
 export function isDbConnectionError(err: unknown): boolean {
   if (!err) return false
-  const e = err as { code?: string; name?: string; message?: string }
+  const e = err as { code?: string; name?: string; message?: string; cause?: unknown; errors?: unknown[] }
   const code = e.code || e.name || ''
   const msg = (e.message || '').toLowerCase()
   const isSequelize = e.name != null && e.name.startsWith('Sequelize')
+  const nestedErrors = Array.isArray(e.errors) ? e.errors : []
+
+  if (nestedErrors.some((nested) => isDbConnectionError(nested))) {
+    return true
+  }
+  if (e.cause && isDbConnectionError(e.cause)) {
+    return true
+  }
+
   return (
     code === 'ECONNREFUSED' ||
     code === 'ENOTFOUND' ||

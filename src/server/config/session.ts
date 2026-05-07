@@ -3,6 +3,7 @@ import type { RequestHandler } from 'express'
 import type { Store } from 'express-session'
 import pg from 'pg'
 import connectPgSimple from 'connect-pg-simple'
+import { logDbError } from '../utils/dbFallback.js'
 
 const DEFAULT_SECRET = 'change-me-in-production'
 const MIN_SECRET_LENGTH = 32
@@ -50,6 +51,11 @@ function createPgSessionStore(): Store {
         user: DB_USER,
         password: DB_PASSWORD,
       })
+
+  /** Prevent raw pg pool error noise when DB goes away temporarily. */
+  pool.on('error', (err: unknown) => {
+    logDbError(err, 'session pool')
+  })
 
   return new PgSession({
     pool,

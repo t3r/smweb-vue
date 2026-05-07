@@ -14,7 +14,7 @@ import { sessionMiddleware } from './config/session.js'
 import passport from './config/passport.js'
 import { sequelize } from './config/database.js'
 import { perIpLimiter, perSessionLimiter } from './middleware/rateLimit.js'
-import { CLIENT_ERROR_MESSAGE } from './utils/dbFallback.js'
+import { CLIENT_ERROR_MESSAGE, isDbConnectionError, logDbError } from './utils/dbFallback.js'
 import { getClientBuildId } from './utils/clientBuildId.js'
 import { startOurAirportsSyncScheduler } from './services/ourAirportsSync.js'
 import { apiDocsBasicAuth } from './middleware/apiDocsBasicAuth.js'
@@ -182,6 +182,21 @@ if (isProduction) {
 /** Unmatched routes (e.g. POST to a non-existent path, or no SPA bundle in production). */
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
+})
+
+/** Ensure DB connectivity errors from middleware/stores become clean API responses. */
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (isDbConnectionError(err)) {
+    logDbError(err, 'express middleware')
+    res.status(503).json({ error: CLIENT_ERROR_MESSAGE })
+    return
+  }
+
+  if (err) {
+    const e = err as Error
+    console.error('[app] unhandled error:', e.stack || e.message || String(err))
+  }
+  res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
 })
 
 const isMainModule = process.argv[1]?.endsWith('app.js') || process.argv[1]?.endsWith('app.ts')
