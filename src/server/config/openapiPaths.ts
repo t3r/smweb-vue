@@ -68,6 +68,39 @@ export const openapiPaths = {
       responses: { '200': { description: 'Recent models list' } },
     },
   },
+  '/models/{id}/rating': {
+    get: {
+      tags: ['Models'],
+      summary: 'Model rating summary',
+      description: 'Average, count, and optional current user rating when session present.',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+      responses: { '200': { description: 'ratingAverage, ratingCount, userRating' } },
+    },
+    put: {
+      tags: ['Models'],
+      summary: 'Rate model (1–5 stars)',
+      security: [{ sessionCookie: [] }],
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              required: ['score'],
+              properties: { score: { type: 'integer', minimum: 1, maximum: 5 } },
+            },
+          },
+        },
+      },
+      responses: {
+        '200': { description: 'Updated rating summary' },
+        '400': { description: 'Invalid id or score' },
+        '401': { description: 'Unauthorized' },
+        '404': { description: 'Model not found' },
+      },
+    },
+  },
   '/models/{id}': {
     get: {
       tags: ['Models'],

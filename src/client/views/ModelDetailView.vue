@@ -32,6 +32,17 @@
 
       <ModelDetailsCard :model="modelForDetailsCard" />
 
+      <Panel header="Rating" class="mt-3 model-rating-panel">
+        <ModelRatingStars
+          :model-id="model.id"
+          :rating-average="model.ratingAverage"
+          :rating-count="model.ratingCount ?? 0"
+          :user-rating="model.userRating"
+          interactive
+          @rated="onModelRated"
+        />
+      </Panel>
+
       <ModelContentCard class="mt-3" :model-id="model.id" />
       <ModelContentCard
         v-if="model.hasGltf"
@@ -162,6 +173,7 @@ import { useAppToast } from '@/composables/useAppToast'
 import ModelDetailsCard from '@/components/ModelDetailsCard.vue'
 import ModelContentCard from '@/components/ModelContentCard.vue'
 import ModelAddPlacementsPanel from '@/components/ModelAddPlacementsPanel.vue'
+import ModelRatingStars from '@/components/ModelRatingStars.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -173,6 +185,9 @@ const model = ref<{
   isStatic?: boolean
   groupId?: number
   hasGltf?: boolean
+  ratingAverage?: number | null
+  ratingCount?: number
+  userRating?: number | null
 } | null>(null)
 const loading = ref(true)
 const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared } = useErrorDialog()
@@ -291,6 +306,21 @@ async function confirmDelete() {
   } finally {
     deleteSubmitting.value = false
   }
+}
+
+function onModelRated(payload: {
+  ratingAverage: number | null
+  ratingCount: number
+  userRating: number
+}) {
+  if (!model.value) return
+  model.value = {
+    ...model.value,
+    ratingAverage: payload.ratingAverage,
+    ratingCount: payload.ratingCount,
+    userRating: payload.userRating,
+  }
+  toastSuccess('Your rating was saved.', 'Rating')
 }
 
 async function fetchModel() {

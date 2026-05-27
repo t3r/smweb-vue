@@ -62,6 +62,34 @@ vi.mock('../../src/server/services/modelService.ts', () => ({
   ),
 }))
 
+vi.mock('../../src/server/services/modelRatingService.ts', () => ({
+  attachRatingsToModels: vi.fn().mockImplementation((models) =>
+    Promise.resolve(
+      (models || []).map((m) => ({
+        ...m,
+        ratingAverage: null,
+        ratingCount: 0,
+        userRating: null,
+      }))
+    )
+  ),
+  getRatingFieldsForModel: vi.fn().mockResolvedValue({
+    ratingAverage: null,
+    ratingCount: 0,
+    userRating: null,
+  }),
+  parseRatingScore: vi.fn().mockImplementation((raw) => {
+    const n = Number(raw)
+    if (!Number.isInteger(n) || n < 1 || n > 5) return null
+    return n
+  }),
+  setModelRating: vi.fn().mockResolvedValue({
+    ratingAverage: 4,
+    ratingCount: 1,
+    userRating: 4,
+  }),
+}))
+
 vi.mock('../../src/server/services/modelgroupService.ts', () => ({
   getModelGroups: vi.fn().mockResolvedValue({ groups: [{ id: 1, name: 'Static', path: 'Static' }] }),
 }))

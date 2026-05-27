@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express'
 import * as modelService from '../services/modelService.js'
+import * as modelRatingService from '../services/modelRatingService.js'
 import * as modelRepo from '../repositories/modelRepository.js'
 import * as requestRepo from '../repositories/requestRepository.js'
 import { logDbError, CLIENT_ERROR_MESSAGE } from '../utils/dbFallback.js'
@@ -40,13 +41,17 @@ export async function getModels(req: Request, res: Response): Promise<void> {
     )
     const { modelIds: pendingModelIds } = await requestRepo.getPendingEntityIds()
     const pendingSet = new Set(pendingModelIds)
-    const models = (data.models || []).map((m) => {
+    const modelsWithPending = (data.models || []).map((m) => {
       const row = m as { id: number; [key: string]: unknown }
       return {
         ...row,
         hasPendingRequest: pendingSet.has(row.id),
       }
     })
+    const models = await modelRatingService.attachRatingsToModels(
+      modelsWithPending as { id: number; [key: string]: unknown }[],
+      req.user?.id ?? null
+    )
     res.json({ ...data, models })
   } catch (err) {
     logDbError(err, 'GET /api/models')
@@ -78,7 +83,8 @@ export async function getModel(req: Request, res: Response): Promise<void> {
     }
     const { modelIds: pendingModelIds } = await requestRepo.getPendingEntityIds()
     const hasPendingRequest = pendingModelIds.includes((model as { id: number }).id)
-    res.json({ ...model, hasPendingRequest })
+    const rating = await modelRatingService.getRatingFieldsForModel(id, req.user?.id ?? null)
+    res.json({ ...model, hasPendingRequest, ...rating })
   } catch (err) {
     logDbError(err, 'GET /api/models/:id')
     res.status(500).json({ error: CLIENT_ERROR_MESSAGE })

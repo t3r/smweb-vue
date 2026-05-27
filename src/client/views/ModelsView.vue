@@ -59,6 +59,21 @@
           <router-link :to="`/models/${data.id}`">{{ data.name || data.filename || 'Unnamed' }}</router-link>
         </template>
       </Column>
+      <Column header="Rating" style="width: 8rem">
+        <template #body="{ data }">
+          <div v-if="data.ratingCount > 0 && data.ratingAverage != null" class="rating-cell">
+            <ModelRatingStars
+              :model-id="data.id"
+              :rating-average="data.ratingAverage"
+              :rating-count="data.ratingCount"
+              compact
+              :show-summary="false"
+            />
+            <span class="rating-cell__text">{{ data.ratingAverage.toFixed(1) }} ({{ data.ratingCount }})</span>
+          </div>
+          <span v-else class="text-color-secondary">—</span>
+        </template>
+      </Column>
       <Column field="group" header="Type" sortable filter-field="group" :show-filter-menu="false">
         <template #filter="{ filterModel, filterCallback }">
           <Select
@@ -113,6 +128,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ErrorDialog from '@/components/ErrorDialog.vue'
+import ModelRatingStars from '@/components/ModelRatingStars.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
 
 const route = useRoute()
@@ -311,6 +327,15 @@ onMounted(async () => {
 .p-4 { padding: 1rem; }
 .text-center { text-align: center; }
 .text-color-secondary { color: var(--p-text-muted-color, #64748b); }
+.rating-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.rating-cell__text {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color, #64748b);
+}
 .add-model-link { margin-right: 0.5rem; font-weight: 500; }
 .thumb-cell { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; display: block; }
 .id-cell { display: inline-flex; align-items: center; gap: 0.35rem; }
