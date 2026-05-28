@@ -10,6 +10,13 @@ Base path: `/api`. Contract for tests and clients. Schema: `sql/scenemodels-sche
 
 ---
 
+## Tiles (STG export)
+
+- **GET /api/tiles/:tile/stg** — anonymous `.stg` placement lines for a packed scenery tile index (PostgreSQL `fn_dumpstgrows`). No authentication.
+  - Response: `200` — `Content-Type: text/plain; charset=utf-8`, body is STG lines terminated with a final newline.
+  - `400` — invalid `:tile` (not a non-negative integer).
+  - `404` — no exportable objects or signs for that tile.
+
 ## Statistics
 
 - **GET /api/statistics** — latest snapshot + pending queue count: `{ "date", "models", "objects", "authors", "pendingRequests" }` (`date` may be `null`).

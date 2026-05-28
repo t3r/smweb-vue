@@ -22,6 +22,31 @@ export const openapiPaths = {
       responses: { '200': { description: 'JSON with buildId' } },
     },
   },
+  '/tiles/{tile}/stg': {
+    get: {
+      tags: ['Scenery'],
+      summary: 'STG file content for a tile',
+      description:
+        'Anonymous read-only dump of placement lines for a FlightGear scenery tile (PostgreSQL `fn_dumpstgrows`).',
+      parameters: [
+        {
+          name: 'tile',
+          in: 'path',
+          required: true,
+          schema: { type: 'integer', minimum: 0 },
+          description: 'Packed scenery tile index',
+        },
+      ],
+      responses: {
+        '200': {
+          description: 'STG lines',
+          content: { 'text/plain': { schema: { type: 'string' } } },
+        },
+        '400': { description: 'Invalid tile number' },
+        '404': { description: 'No objects or signs for this tile' },
+      },
+    },
+  },
   '/statistics': {
     get: {
       tags: ['Statistics'],

@@ -139,6 +139,18 @@ vi.mock('../../src/server/repositories/newsRepository.ts', () => ({
   insertOne: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../../src/server/services/stgService.ts', async () => {
+  const actual = await vi.importActual('../../src/server/services/stgService.ts')
+  return {
+    ...actual,
+    getStgForTile: vi.fn().mockImplementation((tile) =>
+      tile === 42
+        ? Promise.resolve('OBJECT_STATIC Example.ac 8.5 50.0 100.0 90.0')
+        : Promise.resolve(null)
+    ),
+  }
+})
+
 vi.mock('../../src/server/services/statisticsService.ts', () => ({
   getLatest: vi.fn().mockResolvedValue({ date: null, models: 0, objects: 0, authors: 0, pendingRequests: 0 }),
   getHistory: vi.fn().mockResolvedValue({
