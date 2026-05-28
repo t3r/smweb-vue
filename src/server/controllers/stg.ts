@@ -10,9 +10,10 @@ function sendPlain(res: Response, status: number, body: string): void {
  * GET /api/tiles/:tile/stg — anonymous .stg dump for a scenery tile (text/plain).
  */
 export async function getTileStg(req: Request, res: Response): Promise<void> {
-  const parsed = stgService.parseTileParam(req.params.tile)
+  const tileParam = typeof req.params.tile === 'string' ? req.params.tile : (req.params.tile?.[0] ?? '')
+  const parsed = stgService.parseTileParam(tileParam)
   if (!parsed.ok) {
-    sendPlain(res, 400, parsed.message)
+    sendPlain(res, 400, (parsed as { ok: false; message: string }).message)
     return
   }
 
@@ -24,7 +25,7 @@ export async function getTileStg(req: Request, res: Response): Promise<void> {
     }
     sendPlain(res, 200, stg.endsWith('\n') ? stg : `${stg}\n`)
   } catch (err) {
-    logDbError(err, `GET /api/tiles/${req.params.tile}/stg`)
+    logDbError(err, `GET /api/tiles/${tileParam}/stg`)
     if (inTestWithoutDb(err)) {
       sendPlain(res, 404, 'No scenery content for this tile')
       return
