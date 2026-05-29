@@ -67,6 +67,9 @@
         <button type="button" class="map-context-menu__item" role="menuitem" @click="onMeasureFromContextMenu">
           Measure
         </button>
+        <button type="button" class="map-context-menu__item" role="menuitem" @click="onOpenStgPreview">
+          View STG for tile
+        </button>
       </div>
       <div
         v-if="measureActive"
@@ -560,6 +563,16 @@ function updateMeasureFromMouseEvent(e: maplibregl.MapMouseEvent) {
     headingDeg: brg,
     distanceM: dist,
   }
+}
+
+function onOpenStgPreview() {
+  const m = mapContextMenuOpen.value
+  if (!m) return
+  const tile = fgTileIndex(m.lat, m.lng)
+  const base = String(props.resourceApiBase || '/api').replace(/\/$/, '')
+  const url = `${base}/tiles/${tile}/stg`
+  closeMapContextMenu()
+  window.open(url, '_blank', 'noopener')
 }
 
 function onMeasureFromContextMenu() {
