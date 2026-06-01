@@ -1063,10 +1063,14 @@ watch(
   gap: 0.75rem;
 }
 .form-section-gltf {
-  border: 1px dashed var(--p-surface-300);
+  border: 1px dashed var(--p-content-border-color, rgba(0, 0, 0, 0.12));
   border-radius: var(--p-border-radius, 6px);
   padding: 0.85rem;
-  background: var(--p-surface-50, rgba(0, 0, 0, 0.02));
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+.form-section-gltf .form-section-title {
+  border-bottom-color: var(--p-content-border-color, rgba(0, 0, 0, 0.08));
 }
 .form-section-title {
   margin: 0;
@@ -1197,5 +1201,15 @@ watch(
 }
 .required {
   color: var(--p-danger-color);
+}
+</style>
+<style>
+/* Unscoped: dark mode for glTF upload panel (surface-50/100 stay light without override) */
+.dark .form-section-gltf {
+  background: var(--p-surface-700);
+}
+.dark .form-section-gltf .help-list-compact code {
+  background: var(--p-surface-600);
+  color: var(--p-text-color);
 }
 </style>
