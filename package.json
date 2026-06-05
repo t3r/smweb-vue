@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.3",
-    "axios": "^1.16.1",
+    "axios": "^1.17.0",
     "compression": "^1.8.0",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
@@ -34,7 +34,7 @@
     "helmet": "^8.2.0",
     "joi": "^18.2.1",
     "maplibre-gl": "^5.24.0",
-    "morgan": "^1.10.0",
+    "morgan": "^1.11.0",
     "multer": "^2.0.1",
     "node-cache": "^5.1.2",
     "passport": "^0.7.0",
@@ -54,7 +54,7 @@
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-ses": "^3.1056.0",
+    "@aws-sdk/client-ses": "^3.1062.0",
     "@emnapi/core": "^1.10.0",
     "@emnapi/runtime": "^1.10.0",
     "@types/compression": "^1.7.5",
@@ -71,10 +71,10 @@
     "supertest": "^7.0.0",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
-    "tsx": "^4.22.3",
+    "tsx": "^4.22.4",
     "typescript": "~6.0.3",
-    "vite": "^8.0.14",
-    "vitest": "^4.1.7",
-    "vue-tsc": "^3.3.2"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8",
+    "vue-tsc": "^3.3.3"
   }
 }
