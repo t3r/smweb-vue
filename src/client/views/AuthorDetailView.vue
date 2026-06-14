@@ -16,6 +16,13 @@
       </h1>
 
       <Panel header="Details" class="mb-3">
+        <div class="detail-panel-body">
+        <img
+          v-if="gravatarUrl"
+          :src="gravatarUrl"
+          :alt="author.name ? `${author.name}'s avatar` : 'Author avatar'"
+          class="author-gravatar"
+        />
         <div class="detail-grid">
           <span class="detail-label">ID</span>
           <span>#{{ author.id }}</span>
@@ -72,6 +79,7 @@
               <span v-if="roleSaveStatus" class="role-save-status ml-2">{{ roleSaveStatus }}</span>
             </span>
           </template>
+        </div>
         </div>
       </Panel>
 
@@ -134,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ErrorDialog from '@/components/ErrorDialog.vue'
@@ -166,6 +174,23 @@ interface RecentModelRow {
 const recentModels = ref<RecentModelRow[]>([])
 const recentModelsLoading = ref(false)
 const recentModelsError = ref('')
+
+const gravatarUrl = ref<string | null>(null)
+
+watchEffect(async () => {
+  const email = author.value?.email
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    gravatarUrl.value = null
+    return
+  }
+  const normalized = email.trim().toLowerCase()
+  const encoded = new TextEncoder().encode(normalized)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded)
+  const hashHex = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+  gravatarUrl.value = `https://www.gravatar.com/avatar/${hashHex}?s=160&d=mp`
+})
 
 const isAdmin = computed(() => auth.isAdmin)
 
@@ -484,5 +509,25 @@ watch(() => route.params.id, () => void fetchAuthor())
 .merge-another-link {
   text-decoration: none;
   display: inline-block;
+}
+.detail-panel-body {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.author-gravatar {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--p-content-border-color, #e2e8f0);
+  object-fit: cover;
+  display: block;
+}
+@media (max-width: 480px) {
+  .detail-panel-body {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 </style>
