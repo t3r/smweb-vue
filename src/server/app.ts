@@ -82,7 +82,7 @@ app.use(
       directives: {
         ...contentSecurityPolicy.getDefaultDirectives(),
         'connect-src': ["'self'", ...mapTileSources],
-        'img-src': ["'self'", 'data:', 'blob:', ...mapTileSources],
+        'img-src': ["'self'", 'data:', 'blob:', 'https://www.gravatar.com', ...mapTileSources],
         'worker-src': ["'self'", 'blob:'],
       },
     },
