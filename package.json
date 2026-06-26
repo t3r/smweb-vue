@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.3",
-    "axios": "^1.18.0",
+    "axios": "^1.18.1",
     "compression": "^1.8.0",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
@@ -30,7 +30,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
-    "fast-xml-parser": "^5.9.2",
+    "fast-xml-parser": "^5.9.3",
     "helmet": "^8.2.0",
     "joi": "^18.2.3",
     "maplibre-gl": "^5.24.0",
@@ -46,15 +46,15 @@
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",
     "sequelize": "^6.37.8",
-    "sharp": "^0.35.1",
+    "sharp": "^0.35.2",
     "supercluster": "^8.0.1",
     "tar-stream": "^3.2.0",
-    "three": "^0.184.0",
-    "vue": "^3.5.38",
+    "three": "^0.185.0",
+    "vue": "^3.5.39",
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-ses": "^3.1072.0",
+    "@aws-sdk/client-ses": "^3.1075.0",
     "@emnapi/core": "^1.11.1",
     "@emnapi/runtime": "^1.11.1",
     "@types/compression": "^1.7.5",
@@ -73,7 +73,7 @@
     "swagger-ui-express": "^5.0.1",
     "tsx": "^4.22.4",
     "typescript": "~6.0.3",
-    "vite": "^8.0.16",
+    "vite": "^8.1.0",
     "vitest": "^4.1.9",
     "vue-tsc": "^3.3.5"
   }
