@@ -42,7 +42,7 @@
     "passport-gitlab2": "^5.0.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.22.0",
-    "pinia": "^3.0.4",
+    "pinia": "^4.0.2",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",
     "sequelize": "^6.37.8",
