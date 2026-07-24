@@ -54,7 +54,7 @@
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-ses": "^3.1091.0",
+    "@aws-sdk/client-ses": "^3.1094.0",
     "@emnapi/core": "^1.11.2",
     "@emnapi/runtime": "^1.11.2",
     "@types/compression": "^1.7.5",
@@ -75,6 +75,6 @@
     "typescript": "~6.0.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.10",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.8"
   }
 }
