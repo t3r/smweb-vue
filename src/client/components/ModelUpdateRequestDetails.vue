@@ -22,7 +22,7 @@
             <dt>Author</dt>
             <dd :class="{ 'value-modified': fieldDiffs.author }">
               <router-link v-if="Number.isFinite(requested.authorId)" :to="'/authors/' + requested.authorId">
-                Author #{{ requested.authorId }}
+                {{ requestedAuthorLabel }}
               </router-link>
               <span v-else>—</span>
             </dd>
@@ -103,6 +103,8 @@ const { error, errorDialogVisible, clearError, showError, onErrorDialogCleared }
 const currentModel = ref<FetchedModel | null>(null)
 const loading = ref(true)
 const modelGroups = ref<{ id: number; name: string | null; path: string | null }[]>([])
+/** Name for requested.authorId when it differs from the current model author (or while loading). */
+const requestedAuthorName = ref<string | null>(null)
 
 const requested = computed(() => {
   const d = props.details as Record<string, unknown>
@@ -144,6 +146,18 @@ const currentGroupLabel = computed(() => {
   if (!cur) return '—'
   const gid = cur.groupId != null && Number.isFinite(Number(cur.groupId)) ? Number(cur.groupId) : null
   return groupLabel(gid)
+})
+
+const requestedAuthorLabel = computed(() => {
+  const id = requested.value.authorId
+  if (!Number.isFinite(id)) return '—'
+  const cur = currentModel.value?.author
+  if (cur?.id != null && Number(cur.id) === id) {
+    const name = cur.name != null ? String(cur.name).trim() : ''
+    return name || `Author #${id}`
+  }
+  const fetched = requestedAuthorName.value != null ? String(requestedAuthorName.value).trim() : ''
+  return fetched || `Author #${id}`
 })
 
 function normStr(a: unknown, b: unknown): boolean {
@@ -215,11 +229,28 @@ async function fetchCurrentModel() {
   }
 }
 
+async function fetchRequestedAuthorName() {
+  const id = requested.value.authorId
+  requestedAuthorName.value = null
+  if (!Number.isInteger(id) || id < 1) return
+  const cur = currentModel.value?.author
+  if (cur?.id != null && Number(cur.id) === id) return
+  try {
+    const res = await fetch(auth.apiUrl(`/api/authors/${id}`), { credentials: 'include' })
+    if (!res.ok) return
+    const data = (await res.json()) as { name?: string | null }
+    requestedAuthorName.value = data.name != null ? String(data.name).trim() : null
+  } catch {
+    requestedAuthorName.value = null
+  }
+}
+
 watch(
   () => [modelId.value, props.requestSig] as const,
   async () => {
     await loadModelGroups()
     await fetchCurrentModel()
+    await fetchRequestedAuthorName()
   },
   { immediate: true }
 )
