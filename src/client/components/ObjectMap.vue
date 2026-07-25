@@ -91,7 +91,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import InputText from 'primevue/inputtext'
 import { useAppToast } from '@/composables/useAppToast'
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
 import { fgTileGridFeatureCollection, fgTileIndex } from '@/utils/fgSceneryTileGrid'
