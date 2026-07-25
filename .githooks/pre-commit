@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: scan staged changes for secrets using betterleaks.
+#
+# Install betterleaks:
+#   brew install betterleaks
+#   or: https://github.com/zricethezav/betterleaks#installation
+#
+
+set -euo pipefail
+
+if ! command -v betterleaks &>/dev/null; then
+  echo "betterleaks not found. Install it with: brew install betterleaks"
+  echo "Skipping secret scan."
+  exit 0
+fi
+
+# Scan only staged changes (pre-commit mode)
+betterleaks git --pre-commit --staged
+

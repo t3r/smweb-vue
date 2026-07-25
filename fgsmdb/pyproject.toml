@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fgsmdb"
+version = "0.1.0"
+description = "FlightGear Scenemodels Database Tools"
+readme = "README.md"
+license = "GPL-2.0-only"
+requires-python = ">=3.10"
+authors = [
+    { name = "Torsten Dreyer", email = "torsten@t3r.de" },
+]
+keywords = ["flightgear", "scenery", "terrasync", "export"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Games/Entertainment :: Simulation",
+]
+dependencies = [
+    "psycopg2-binary>=2.9",
+    "python-dotenv>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/FlightGear/scenemodels"
+Repository = "https://github.com/FlightGear/scenemodels"
+Issues = "https://github.com/FlightGear/scenemodels/issues"
+
+[project.scripts]
+fgsmdb = "fgsmdb.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["fgsmdb*"]

@@ -93,6 +93,22 @@ Writes do not hit live scenery tables immediately: each change is a **position r
                                    +---------------------------+
 ```
 
+## Prerequisites
+
+### Secret scanning (pre-commit hook)
+
+This repository uses a Git pre-commit hook powered by [betterleaks](https://github.com/zricethezav/betterleaks) to prevent accidentally committing credentials, API keys, or other secrets.
+
+```bash
+# Install betterleaks
+brew install betterleaks
+
+# Enable the shared hooks directory
+git config core.hooksPath .githooks
+```
+
+The hook runs automatically on every `git commit` and blocks the commit if secrets are detected. To bypass in case of a false positive: `git commit --no-verify`.
+
 ## Quick start
 
 ```bash

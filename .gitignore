@@ -6,12 +6,20 @@ npm-debug.log*
 .env
 .env.local
 
+.venv
+
+export-legacy
+export
+
+fgsmdb.egg-info
+
 # Deploy-generated app version (see VERSION.example, scripts/resolve-git-slug.mjs)
 VERSION
 
 # Build outputs
 dist/
 build/
+*.egg-info/
 
 # Lambda deployment bundle (CI / local before terraform apply)
 lambda/email-queue-worker/bundle.zip

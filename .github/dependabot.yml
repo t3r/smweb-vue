@@ -54,3 +54,19 @@ updates:
         update-types:
           - patch
           - minor
+
+  - package-ecosystem: pip
+    directory: /fgsmdb
+    schedule:
+      interval: weekly
+      day: friday
+      time: "06:15"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 8
+    groups:
+      pip-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
