@@ -21,7 +21,7 @@
     "test:run:db": "NODE_ENV=test TEST_USE_REAL_DB=1 vitest run"
   },
   "dependencies": {
-    "@primeuix/themes": "^2.0.3",
+    "@primeuix/themes": "^3.0.0",
     "axios": "^1.18.1",
     "compression": "^1.8.0",
     "connect-pg-simple": "^10.0.0",
