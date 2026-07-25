@@ -54,9 +54,9 @@
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-ses": "^3.1094.0",
-    "@emnapi/core": "^1.11.2",
-    "@emnapi/runtime": "^1.11.2",
+    "@aws-sdk/client-ses": "^3.1095.0",
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
     "@types/compression": "^1.7.5",
     "@types/express": "^5.0.0",
     "@types/morgan": "^1.9.9",
