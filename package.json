@@ -21,7 +21,7 @@
     "test:run:db": "NODE_ENV=test TEST_USE_REAL_DB=1 vitest run"
   },
   "dependencies": {
-    "@primeuix/themes": "^3.0.0",
+    "@primeuix/themes": "^2.0.3",
     "axios": "^1.18.1",
     "compression": "^1.8.0",
     "connect-pg-simple": "^10.0.0",
@@ -43,8 +43,8 @@
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.22.0",
     "pinia": "^4.0.2",
-    "primeicons": "^8.0.0",
-    "primevue": "^5.0.0",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.3.3",
     "sequelize": "^6.37.8",
     "sharp": "^0.35.3",
     "supercluster": "^8.0.1",

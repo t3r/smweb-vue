@@ -19,6 +19,14 @@ updates:
         update-types:
           - patch
           - minor
+    ignore:
+      # PrimeVue 5+ is commercial (no longer open source)
+      - dependency-name: "primevue"
+        versions: [">=5.0.0"]
+      - dependency-name: "@primeuix/themes"
+        versions: [">=3.0.0"]
+      - dependency-name: "primeicons"
+        versions: [">=8.0.0"]
     # Semver-major updates do not match the group → Dependabot opens a separate PR per
     # dependency (review queue / notification — no auto-merge in dependabot-auto-merge.yml).
 
