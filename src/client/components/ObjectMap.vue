@@ -79,7 +79,10 @@
         :style="{ left: `${measureActive.hudX}px`, top: `${measureActive.hudY}px` }"
       >
         <div class="map-measure-hud__row map-measure-hud__heading">
-          {{ measureActive.distanceM < 1 ? '—' : `${measureActive.headingDeg.toFixed(1)}°` }}
+          {{ measureActive.distanceM < 1 ? '—' : `${measureActive.headingDeg.toFixed(1)}° true` }}
+        </div>
+        <div class="map-measure-hud__row map-measure-hud__heading">
+          {{ measureActive.distanceM < 1 ? '—' : `${trueHeadingToStg(measureActive.headingDeg).toFixed(1)}° STG` }}
         </div>
         <div class="map-measure-hud__row map-measure-hud__dist">{{ formatMeasureDistance(measureActive.distanceM) }}</div>
       </div>
@@ -91,7 +94,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import InputText from 'primevue/inputtext'
 import { useAppToast } from '@/composables/useAppToast'
-import * as maplibregl from 'maplibre-gl'
+import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
 import { fgTileGridFeatureCollection, fgTileIndex } from '@/utils/fgSceneryTileGrid'
@@ -405,11 +408,17 @@ function bearingDegrees(lat1: number, lng1: number, lat2: number, lng2: number):
 
 function formatMeasureDistance(meters: number): string {
   if (!Number.isFinite(meters)) return '—'
-  if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`
-  if (meters >= 1) return `${meters.toFixed(0)} m`
+  const nm = meters / 1852
+  if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km / ${nm.toFixed(2)} nm`
+  if (meters >= 1) return `${meters.toFixed(0)} m / ${nm.toFixed(3)} nm`
   return `${(meters * 100).toFixed(0)} cm`
 }
 
+function trueHeadingToStg(trueHdg: number): number {
+  const h = ((trueHdg % 360) + 360) % 360
+  if (h > 180) return 540 - h
+  return 180 - h
+}
 function createMeasureArrowImageData() {
   const size = 26
   const canvas = document.createElement('canvas')

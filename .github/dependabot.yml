@@ -27,6 +27,9 @@ updates:
         versions: [">=3.0.0"]
       - dependency-name: "primeicons"
         versions: [">=8.0.0"]
+      # maplibre-gl 6 breaks layer rendering with raster-only styles
+      - dependency-name: "maplibre-gl"
+        versions: [">=6.0.0"]
     # Semver-major updates do not match the group → Dependabot opens a separate PR per
     # dependency (review queue / notification — no auto-merge in dependabot-auto-merge.yml).
 
