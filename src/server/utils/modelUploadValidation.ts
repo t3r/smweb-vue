@@ -14,7 +14,7 @@ const VALID_POW2 = new Set([
   1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
 ])
 
-export const MODEL_UPLOAD_MAX_FILE_BYTES = 2_000_000
+export const MODEL_UPLOAD_MAX_FILE_BYTES = 2_097_152
 
 const RE_AC3D_FILENAME = /^[a-zA-Z0-9_.-]+\.(ac|AC)$/u
 const RE_XML_FILENAME = /^[a-zA-Z0-9_.-]+\.(xml|XML)$/u
