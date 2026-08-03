@@ -19,7 +19,7 @@ export const ROUTES_META = [
   { path: '/authors/:id', name: 'AuthorDetail', title: 'Author' },
   { path: '/merge/confirm', name: 'MergeConfirm', title: 'Confirm merge' },
   { path: '/account/merge', name: 'MergeAccount', title: 'Merge account' },
-  { path: '/position-requests', name: 'PositionRequests', title: 'Position requests' },
+  { path: '/position-requests', name: 'PositionRequests', title: 'Pending requests' },
 ] as const
 
 export type AppRouteName = (typeof ROUTES_META)[number]['name']

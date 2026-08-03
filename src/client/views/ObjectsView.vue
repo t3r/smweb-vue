@@ -81,7 +81,7 @@
         </template>
         <template #body="{ data }">{{ data.type || '—' }}</template>
       </Column>
-      <Column field="country" header="Country" sortable filter-field="country" :show-filter-menu="false">
+      <Column field="country" header="Country/Region" sortable filter-field="country" :show-filter-menu="false">
         <template #filter="{ filterModel, filterCallback }">
           <Select
             v-model="filterModel.value"
