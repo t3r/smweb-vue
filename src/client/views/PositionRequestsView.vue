@@ -135,11 +135,12 @@
           :style="{ width: '28rem' }"
           :closable="true"
           @hide="actionRequest = null"
+          @show="focusAcceptButton"
         >
           <p class="m-0">Accept this request? The change will be applied to the database.</p>
           <template #footer>
             <Button label="Cancel" severity="secondary" @click="acceptDialogVisible = false" />
-            <Button label="Accept" icon="pi pi-check" severity="success" :loading="acceptLoading" @click="confirmAccept" />
+            <Button ref="acceptButtonRef" label="Accept" icon="pi pi-check" severity="success" :loading="acceptLoading" @click="confirmAccept" autofocus />
           </template>
         </Dialog>
 
@@ -184,13 +185,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePendingRequestCountStore } from '@/stores/pendingRequestCount'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useErrorDialog } from '@/composables/useErrorDialog'
 import { useAppToast } from '@/composables/useAppToast'
 import Dialog from 'primevue/dialog'
+import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ModelDetailsCard from '@/components/ModelDetailsCard.vue'
 import ModelContentCard from '@/components/ModelContentCard.vue'
@@ -228,6 +230,14 @@ const declineDialogVisible = ref(false)
 const acceptLoading = ref(false)
 const declineLoading = ref(false)
 const declineReason = ref('')
+const acceptButtonRef = ref<InstanceType<typeof Button> | null>(null)
+
+function focusAcceptButton() {
+  nextTick(() => {
+    const el = acceptButtonRef.value?.$el as HTMLElement | undefined
+    el?.focus()
+  })
+}
 
 function formatDetails(details: unknown) {
   if (details == null) return '—'
