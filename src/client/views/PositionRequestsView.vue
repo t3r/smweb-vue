@@ -1,7 +1,10 @@
 <template>
   <div>
     <h1 class="mt-0">Pending requests</h1>
-    <p v-if="auth.isReviewer" class="text-color-secondary mb-4">Review and accept or decline queued submissions.</p>
+    <p v-if="auth.isReviewer" class="text-color-secondary mb-4">
+      Review and accept or decline queued submissions.
+      <span class="keyboard-hint">Keys: <kbd>↑</kbd><kbd>↓</kbd> navigate · <kbd>Enter</kbd> expand · <kbd>A</kbd> accept · <kbd>D</kbd> decline · <kbd>Esc</kbd> collapse</span>
+    </p>
     <p v-else class="text-color-secondary mb-4">
       All pending submissions are listed here. Expanding a request shows everything your account may access; model files
       and some details stay restricted unless you submitted the request or are a reviewer.
@@ -23,6 +26,7 @@
             responsive-layout="scroll"
             class="p-datatable-sm"
             v-model:expandedRows="expandedRows"
+            :row-class="rowClass"
           >
             <Column expander style="width: 3rem" />
             <Column field="id" header="ID" style="width: 5rem" />
@@ -180,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePendingRequestCountStore } from '@/stores/pendingRequestCount'
 import ErrorDialog from '@/components/ErrorDialog.vue'
@@ -421,7 +425,95 @@ async function confirmDecline() {
 onMounted(async () => {
   await fetchCountries()
   fetchRequests()
+  document.addEventListener('keydown', onKeyDown)
 })
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onKeyDown)
+})
+
+/** Index of the currently focused row in the pending list. */
+const focusedIndex = ref(0)
+
+/** The currently expanded request (if exactly one is expanded). */
+const expandedRequest = computed(() => {
+  const ids = Object.keys(expandedRows.value).filter((k) => expandedRows.value[k])
+  if (ids.length !== 1) return null
+  const id = Number(ids[0])
+  return pending.value.find((p) => p.id === id) || null
+})
+
+function rowClass(data: PendingItem) {
+  const idx = pending.value.indexOf(data)
+  return idx === focusedIndex.value ? 'row-focused' : ''
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  // Don't intercept when a dialog is open or user is typing in an input
+  if (acceptDialogVisible.value || declineDialogVisible.value) return
+  const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+  if (!pending.value.length) return
+
+  switch (e.key) {
+    case 'ArrowDown':
+    case 'j': {
+      e.preventDefault()
+      focusedIndex.value = Math.min(focusedIndex.value + 1, pending.value.length - 1)
+      break
+    }
+    case 'ArrowUp':
+    case 'k': {
+      e.preventDefault()
+      focusedIndex.value = Math.max(focusedIndex.value - 1, 0)
+      break
+    }
+    case 'Enter':
+    case ' ': {
+      e.preventDefault()
+      const item = pending.value[focusedIndex.value]
+      if (!item) break
+      // Toggle expansion
+      if (expandedRows.value[item.id]) {
+        const copy = { ...expandedRows.value }
+        delete copy[item.id]
+        expandedRows.value = copy
+      } else {
+        // Collapse others, expand this one
+        expandedRows.value = { [item.id]: true }
+      }
+      break
+    }
+    case 'Escape': {
+      // Collapse all expanded rows
+      if (Object.keys(expandedRows.value).length) {
+        e.preventDefault()
+        expandedRows.value = {}
+      }
+      break
+    }
+    case 'a':
+    case 'A': {
+      if (!auth.isReviewer) break
+      const req = expandedRequest.value
+      if (req) {
+        e.preventDefault()
+        openAcceptDialog(req)
+      }
+      break
+    }
+    case 'd':
+    case 'D': {
+      if (!auth.isReviewer) break
+      const req = expandedRequest.value
+      if (req) {
+        e.preventDefault()
+        openDeclineDialog(req)
+      }
+      break
+    }
+  }
+}
 </script>
 
 <style scoped>
@@ -479,6 +571,28 @@ onMounted(async () => {
   color: var(--p-text-color-secondary);
 }
 .mt-2 { margin-top: 0.5rem; }
+.keyboard-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+.keyboard-hint kbd {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  margin: 0 0.1rem;
+  font-size: 0.7rem;
+  font-family: inherit;
+  border: 1px solid var(--p-content-border-color, #ccc);
+  border-radius: 3px;
+  background: var(--p-surface-50, #f8f9fa);
+  box-shadow: 0 1px 0 var(--p-content-border-color, #ccc);
+}
+:deep(.row-focused) {
+  outline: 2px solid var(--p-primary-color, #3b82f6);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 8%, transparent) !important;
+}
 </style>
 <style>
 /* Unscoped: dark mode override for expansion (element may be rendered inside DataTable) */
