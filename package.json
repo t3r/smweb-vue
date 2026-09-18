@@ -47,7 +47,7 @@
     "primevue": "^4.3.3",
     "sequelize": "^6.37.8",
     "sharp": "^0.35.4",
-    "supercluster": "^8.0.1",
+    "supercluster": "^9.1.0",
     "tar-stream": "^3.2.1",
     "three": "^0.186.0",
     "vue": "^3.5.42",
