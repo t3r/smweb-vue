@@ -15,7 +15,7 @@ export function buildTarGz(entries: TarEntry[]): Promise<Buffer> {
     const pack = tar.pack()
     const chunks: Buffer[] = []
 
-    pack.on('data', (chunk: Buffer) => chunks.push(chunk))
+    pack.on('data', (chunk: unknown) => chunks.push(chunk as Buffer))
     pack.on('error', reject)
     pack.on('end', () => {
       const tarBuffer = Buffer.concat(chunks)
