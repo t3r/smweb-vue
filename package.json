@@ -26,8 +26,8 @@
     "compression": "^1.8.2",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
-    "dotenv": "^18.0.5",
-    "express": "^5.2.1",
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "express-session": "^1.19.0",
     "fast-xml-parser": "^5.11.2",
@@ -51,20 +51,20 @@
     "tar-stream": "^3.2.2",
     "three": "^0.186.1",
     "vue": "^3.5.43",
-    "vue-router": "^5.3.1"
+    "vue-router": "^5.4.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-ses": "^3.1146.0",
+    "@aws-sdk/client-ses": "^3.1150.0",
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@types/compression": "^1.7.5",
     "@types/express": "^5.0.0",
     "@types/morgan": "^1.9.9",
     "@types/multer": "^2.3.0",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "@types/passport": "^1.0.16",
     "@types/passport-google-oauth20": "^2.0.17",
-    "@vitejs/plugin-vue": "^6.0.9",
+    "@vitejs/plugin-vue": "^6.0.10",
     "concurrently": "^10.0.6",
     "handlebars": "^4.7.10",
     "nodemon": "^3.1.14",
@@ -73,8 +73,8 @@
     "swagger-ui-express": "^5.0.1",
     "tsx": "^4.23.15",
     "typescript": "~7.0.2",
-    "vite": "^8.3.3",
-    "vitest": "^5.0.3",
-    "vue-tsc": "^3.3.12"
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4",
+    "vue-tsc": "^3.3.13"
   }
 }
