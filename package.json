@@ -26,13 +26,13 @@
     "compression": "^1.8.2",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
-    "dotenv": "^18.0.7",
+    "dotenv": "^18.0.8",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "express-session": "^1.19.0",
     "fast-xml-parser": "^5.11.2",
     "helmet": "^8.3.0",
-    "joi": "^18.2.9",
+    "joi": "^18.3.0",
     "maplibre-gl": "^5.24.0",
     "morgan": "^1.12.1",
     "multer": "^2.4.0",
@@ -42,7 +42,7 @@
     "passport-gitlab2": "^5.0.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.23.1",
-    "pinia": "^4.0.3",
+    "pinia": "^4.1.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.3.3",
     "sequelize": "^6.37.8",
@@ -50,11 +50,11 @@
     "supercluster": "^9.1.0",
     "tar-stream": "^3.2.2",
     "three": "^0.186.1",
-    "vue": "^3.5.43",
+    "vue": "^3.5.44",
     "vue-router": "^5.4.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-ses": "^3.1150.0",
+    "@aws-sdk/client-ses": "^3.1153.0",
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@types/compression": "^1.7.5",
@@ -74,7 +74,7 @@
     "tsx": "^4.23.15",
     "typescript": "~7.0.2",
     "vite": "^8.3.4",
-    "vitest": "^5.0.4",
+    "vitest": "^5.0.5",
     "vue-tsc": "^3.3.13"
   }
 }
