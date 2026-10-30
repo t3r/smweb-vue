@@ -26,7 +26,7 @@
     "compression": "^1.8.2",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
-    "dotenv": "^18.0.8",
+    "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "express-session": "^1.19.0",
@@ -54,7 +54,7 @@
     "vue-router": "^5.4.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-ses": "^3.1153.0",
+    "@aws-sdk/client-ses": "^3.1157.0",
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@types/compression": "^1.7.5",
@@ -73,7 +73,7 @@
     "swagger-ui-express": "^5.0.1",
     "tsx": "^4.23.15",
     "typescript": "~7.0.2",
-    "vite": "^8.3.4",
+    "vite": "^8.3.5",
     "vitest": "^5.0.5",
     "vue-tsc": "^3.3.13"
   }
