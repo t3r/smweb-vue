@@ -203,3 +203,78 @@ fgscenery/
 ## License
 
 GNU General Public License v2.0 — see [LICENCE](../LICENCE).
+
+## Development
+
+### Building and publishing
+
+Requires Python 3.10+ and a venv with build tools:
+
+```bash
+cd fgsmdb
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip build twine
+```
+
+Bump the version in `pyproject.toml`, then build:
+
+```bash
+python -m build
+```
+
+This produces `dist/fgsmdb-<version>.tar.gz` and `dist/fgsmdb-<version>-py3-none-any.whl`.
+
+**Via GitHub Actions (recommended)**
+
+Push a tag matching `fgsmdb-v*` to trigger the publish workflow, which uses
+PyPI trusted publishing — no credentials required:
+
+```bash
+git tag fgsmdb-v0.1.2
+git push origin fgsmdb-v0.1.2
+```
+
+The workflow is defined in `.github/workflows/publish-fgsmdb.yml`. It requires
+a GitHub environment named `pypi` and a trusted publisher configured on PyPI at
+`https://pypi.org/manage/project/fgsmdb/settings/` with:
+
+| Field | Value |
+|-------|-------|
+| Owner | `FlightGear` |
+| Repository | `scenemodels` |
+| Workflow | `publish-fgsmdb.yml` |
+| Environment | `pypi` |
+
+**Manually via twine**
+
+```bash
+twine upload dist/*
+```
+
+Twine will prompt for credentials. Use `__token__` as the username and a PyPI
+API token as the password. To avoid the prompt, set environment variables:
+
+```bash
+export TWINE_USERNAME=__token__
+export TWINE_PASSWORD=<your-pypi-api-token>
+twine upload dist/*
+```
+
+**Testing before publishing**
+
+To verify the package installs correctly without affecting PyPI:
+
+```bash
+# Upload to TestPyPI
+twine upload --repository testpypi dist/*
+
+# Install from TestPyPI in a fresh venv
+python3 -m venv /tmp/test-fgsmdb
+source /tmp/test-fgsmdb/bin/activate
+pip install --index-url https://test.pypi.org/simple/ fgsmdb
+python -m fgsmdb --help
+```
+
+PyPI does not allow overwriting an existing version. If an upload fails
+partway through, bump the version number before retrying.

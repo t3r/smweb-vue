@@ -92,8 +92,10 @@ def create_root_dirindex(fg_scenery: str, fg_scenery_export: str):
         logger.info("Creating Airports .dirindex...")
         create_dirindex(airports_path, "Airports")
 
-        # Create Airports archive
-        archive_path = os.path.join(fg_scenery, "Airports_archive.tgz")
+        # Create Airports archive in the export directory so it gets picked
+        # up by the upload step and synced into fg_scenery alongside Objects
+        # and Models.
+        archive_path = os.path.join(fg_scenery_export, "Airports_archive.tgz")
         logger.info("Creating Airports_archive.tgz...")
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(airports_path, arcname="Airports")
@@ -137,8 +139,8 @@ def create_root_dirindex(fg_scenery: str, fg_scenery_export: str):
         if os.path.isfile(terrain_dirindex):
             f.write(f"d:Terrain:{sha1_of_file(terrain_dirindex)}\n")
 
-        # Airports archive tarball
-        archive_path = os.path.join(fg_scenery, "Airports_archive.tgz")
+        # Airports archive tarball (staged in export dir, synced to fg_scenery by upload step)
+        archive_path = os.path.join(fg_scenery_export, "Airports_archive.tgz")
         if os.path.isfile(archive_path):
             archive_hash = sha1_of_file(archive_path)
             archive_size = os.stat(archive_path).st_size
