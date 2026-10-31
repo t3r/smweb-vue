@@ -2,36 +2,63 @@
 
 Equivalent to the legacy gndelev.sh script.
 
-This step requires:
-- fgelev binary (from FlightGear/SimGear)
-- Terrain data in FG_SCENERY
-- FG_ROOT pointing to FlightGear data (defaults.xml)
+This step requires fgelev reachable in one of three ways:
+- Local binary (FGELEV_PATH)
+- Docker container (FGELEV_DOCKER_IMAGE)
+- Remote TCP service (FGELEV_TCP_HOST / FGELEV_TCP_PORT)
 """
 
 import logging
 import os
-import subprocess
+
 from ..db import Database
+from ..fgelev import FgElevDaemon
 
 logger = logging.getLogger(__name__)
 
 
-def run(db: Database, fgelev_path: str, fg_root: str, fg_scenery: str):
+def run(
+    db: Database,
+    fgelev_path: str,
+    fg_root: str,
+    fg_scenery: str,
+    docker_image: str | None = None,
+    tcp_host: str | None = None,
+    tcp_port: int = 9000,
+):
     """Compute ground elevations for objects with ob_gndelev = -9999.
 
-    Queries unprocessed objects from the DB, pipes their coordinates through
-    fgelev, then updates the database with computed elevations.
+    Queries unprocessed objects from the DB, streams their coordinates
+    through a persistent fgelev daemon (so terrain tiles stay cached),
+    then updates the database with computed elevations.
+
+    Mode selection (first match wins):
+        1. tcp_host set  → connect to remote fgelev TCP service
+        2. docker_image set → spawn fgelev via docker run
+        3. otherwise → run fgelev as a local binary
 
     Args:
         db: Database connection wrapper.
-        fgelev_path: Path to the fgelev binary.
-        fg_root: FG_ROOT path (FlightGear data directory).
-        fg_scenery: FG_SCENERY path (terrain data directory).
+        fgelev_path: Path to the fgelev binary (local or inside container).
+        fg_root: FG_ROOT path — not used in TCP mode (configured server-side).
+        fg_scenery: FG_SCENERY path — not used in TCP mode.
+        docker_image: Docker image to run fgelev in (optional).
+        tcp_host: Hostname/IP of a remote fgelev TCP service (optional).
+        tcp_port: TCP port of the remote service (default: 9000).
     """
-    terrain_path = os.path.join(fg_scenery, "Terrain")
-    if not os.path.isdir(terrain_path):
-        logger.error("No Terrain found in %s. Skipping gndelev.", fg_scenery)
-        return
+    if tcp_host:
+        daemon = FgElevDaemon.tcp(tcp_host, tcp_port)
+        logger.info("Using remote fgelev service at %s:%d", tcp_host, tcp_port)
+    else:
+        terrain_path = os.path.join(fg_scenery, "Terrain")
+        if not os.path.isdir(terrain_path):
+            logger.error("No Terrain found in %s. Skipping gndelev.", fg_scenery)
+            return
+        if docker_image:
+            daemon = FgElevDaemon.docker(docker_image, fg_root, fg_scenery, fgelev_path)
+            logger.info("Using fgelev from Docker image: %s", docker_image)
+        else:
+            daemon = FgElevDaemon.local(fgelev_path, fg_root, fg_scenery)
 
     logger.info("Querying objects needing ground elevation...")
     rows = db.execute(
@@ -46,62 +73,26 @@ def run(db: Database, fgelev_path: str, fg_root: str, fg_scenery: str):
         return
 
     logger.info("Computing ground elevation for %d objects...", len(rows))
-
-    # Prepare input for fgelev: "id lon lat\n" per line
-    fgelev_input = ""
-    for row in rows:
-        fgelev_input += f"{row['ob_id']} {row['lon']} {row['lat']}\n"
-
-    # Run fgelev
-    env = os.environ.copy()
-    env["FG_ROOT"] = fg_root
-    env["FG_SCENERY"] = fg_scenery
+    update_count = 0
 
     try:
-        result = subprocess.run(
-            [fgelev_path],
-            input=fgelev_input,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
-    except FileNotFoundError:
-        logger.error("fgelev binary not found at %s", fgelev_path)
+        with daemon as fgelev:
+            for row in rows:
+                ob_id = row["ob_id"]
+                elevation = fgelev.query(ob_id, row["lon"], row["lat"])
+
+                if elevation is None:
+                    logger.warning("No elevation result for ob_id=%s, skipping.", ob_id)
+                    continue
+
+                db.execute(
+                    "UPDATE fgs_objects SET ob_gndelev = %s WHERE ob_id = %s AND ob_gndelev = -9999",
+                    (elevation, ob_id),
+                )
+                update_count += 1
+
+    except (FileNotFoundError, ConnectionRefusedError, OSError) as exc:
+        logger.error("Could not reach fgelev: %s", exc)
         return
-
-    # fgelev may return non-zero on EOF, that's expected
-    if result.stdout:
-        _process_fgelev_output(db, result.stdout)
-    else:
-        logger.warning("fgelev produced no output. stderr: %s", result.stderr[:500])
-
-
-def _process_fgelev_output(db: Database, output: str):
-    """Parse fgelev output and update the database.
-
-    fgelev output format: "id:elevation\n"
-    """
-    update_count = 0
-    for line in output.strip().split("\n"):
-        line = line.strip()
-        if not line or ":" not in line:
-            continue
-
-        parts = line.split(":")
-        if len(parts) != 2:
-            continue
-
-        try:
-            ob_id = int(parts[0].strip())
-            elevation = float(parts[1].strip())
-        except ValueError:
-            logger.warning("Could not parse fgelev output line: %s", line)
-            continue
-
-        db.execute(
-            "UPDATE fgs_objects SET ob_gndelev = %s WHERE ob_id = %s AND ob_gndelev = -9999",
-            (elevation, ob_id),
-        )
-        update_count += 1
 
     logger.info("Updated ground elevation for %d objects.", update_count)

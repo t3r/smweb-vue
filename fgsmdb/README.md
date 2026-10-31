@@ -11,13 +11,14 @@ pip install fgsmdb
 Or install from source:
 
 ```bash
-cd export-legacy/fgsmdb
+cd fgsmdb
 pip install .
 ```
 
 For development:
 
 ```bash
+cd fgsmdb
 pip install -e .
 ```
 
@@ -32,9 +33,12 @@ cp .env.example .env
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PGURI` | PostgreSQL connection URI (required) | — |
-| `FGELEV_PATH` | Path to the fgelev binary | `/usr/local/bin/fgelev` |
-| `FG_ROOT` | FlightGear data root (needed by fgelev) | `/app/data` |
-| `FG_SCENERY` | Local scenery path (Terrain, Airports, etc.) | `./fgscenery` |
+| `FGELEV_PATH` | Path to the fgelev binary (local mode) | `/usr/local/bin/fgelev` |
+| `FGELEV_DOCKER_IMAGE` | Docker image to run fgelev in (Docker mode) | — |
+| `FGELEV_TCP_HOST` | Hostname of a remote fgelev TCP service (TCP mode) | — |
+| `FGELEV_TCP_PORT` | Port of the remote fgelev TCP service | `9000` |
+| `FG_ROOT` | FlightGear data root — not needed in TCP mode | `/app/data` |
+| `FG_SCENERY` | Local scenery path (Terrain, Airports, etc.) — not needed in TCP mode | `./fgscenery` |
 | `FG_SCENERY_EXPORT` | Working directory for exported files | `./export` |
 | `GROUNDNETS_PATH` | Path to groundnets git repository | `./groundnets` |
 | `MIN_UPDATES` | Minimum pending updates to trigger export | `1` |
@@ -43,6 +47,63 @@ cp .env.example .env
 
 For remote distribution, rsync uses your `~/.ssh/config` for host aliases,
 usernames, and identity files.
+
+### fgelev modes
+
+The `gndelev` step needs to reach a running fgelev binary. Three modes are
+supported; the first one configured wins:
+
+**TCP service (recommended for server deployments)**
+
+Run the fgelev Docker image as a persistent service, for example in a
+Docker Compose stack:
+
+```yaml
+services:
+  fgelev:
+    build:
+      context: ./export/fgelev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - ${FG_ROOT}:/fg/root:ro
+      - ${FG_SCENERY}:/fg/scenery:ro
+    environment:
+      FG_ROOT: /fg/root
+      FG_SCENERY: /fg/scenery
+```
+
+Then point fgsmdb at the service — no local terrain data needed:
+
+```ini
+FGELEV_TCP_HOST=fgelev    # service name in Compose, or any hostname/IP
+FGELEV_TCP_PORT=9000      # default, can be omitted
+```
+
+The service speaks the same line-oriented protocol as the local binary
+(`id lon lat\n` in, `id:elevation\n` out) via socat on port 9000.
+fgelev's terrain-tile cache persists for the lifetime of the connection,
+which covers the entire export run.
+
+**Docker run (one-shot container per export run)**
+
+```ini
+FGELEV_DOCKER_IMAGE=fgelev:latest
+FG_ROOT=/path/to/fg/data
+FG_SCENERY=/path/to/scenery
+```
+
+fgsmdb will call `docker run --rm --interactive` with fg_root and
+fg_scenery bind-mounted read-only into the container.
+
+**Local binary**
+
+```ini
+FGELEV_PATH=/usr/local/bin/fgelev
+FG_ROOT=/path/to/fg/data
+FG_SCENERY=/path/to/scenery
+```
 
 ## Usage
 
@@ -86,7 +147,7 @@ python3 -m fgsmdb export -v
 | Step | Description |
 |------|-------------|
 | `sanitize` | Fix data integrity: update tile numbers, nullify zero elevation offsets |
-| `gndelev` | Compute ground elevation for new objects using fgelev |
+| `gndelev` | Compute ground elevation for new objects using fgelev (local binary, Docker, or TCP service) |
 | `export` | Export shared/per-hemisphere models and generate .stg files from the database |
 | `mkdiridx` | Create `.dirindex` files for TerraSync and the Airports archive |
 | `upload` | Sync exported files to the local scenery tree (hash-based, copies only changes) |

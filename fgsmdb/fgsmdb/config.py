@@ -22,6 +22,9 @@ def load_config(env_file: str | None = None) -> dict:
     config = {
         "pguri": os.environ["PGURI"],
         "fgelev_path": os.environ.get("FGELEV_PATH", "/usr/local/bin/fgelev"),
+        "fgelev_docker_image": os.environ.get("FGELEV_DOCKER_IMAGE", ""),
+        "fgelev_tcp_host": os.environ.get("FGELEV_TCP_HOST", ""),
+        "fgelev_tcp_port": int(os.environ.get("FGELEV_TCP_PORT", "9000")),
         "fg_root": os.environ.get("FG_ROOT", "/app/data"),
         "fg_scenery": os.environ.get("FG_SCENERY", "./fgscenery"),
         "fg_scenery_export": os.environ.get("FG_SCENERY_EXPORT", "./export"),

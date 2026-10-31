@@ -125,6 +125,9 @@ def run(args):
                 fgelev_path=config["fgelev_path"],
                 fg_root=config["fg_root"],
                 fg_scenery=config["fg_scenery"],
+                docker_image=config["fgelev_docker_image"] or None,
+                tcp_host=config["fgelev_tcp_host"] or None,
+                tcp_port=config["fgelev_tcp_port"],
             )
 
         if "export" in steps:
