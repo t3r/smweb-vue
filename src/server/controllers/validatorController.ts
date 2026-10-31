@@ -3,6 +3,7 @@ import * as requestRepo from '../repositories/requestRepository.js'
 import * as requestExecutor from '../services/requestExecutor.js'
 import * as authorRepo from '../repositories/authorRepository.js'
 import * as newsRepo from '../repositories/newsRepository.js'
+import * as objectRepo from '../repositories/objectRepository.js'
 import { logDbError, CLIENT_ERROR_MESSAGE } from '../utils/dbFallback.js'
 import {
   enqueuePositionRequestAccepted,
@@ -193,6 +194,72 @@ export async function reject(req: Request, res: Response): Promise<void> {
     res.json({ success: true, message: 'Request rejected and removed' })
   } catch (err) {
     logDbError(err, 'POST /api/submissions/pending/:sig/reject')
+    res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
+  }
+}
+
+/**
+ * Scan all pending OBJECT_UPDATE requests and decline (delete without email) any whose
+ * submitted values are identical to the current database state.
+ * Returns a list of removed request sigs and a count.
+ */
+export async function purgeUnchangedObjectUpdates(req: Request, res: Response): Promise<void> {
+  try {
+    const { ok } = await requestRepo.getPendingRequests()
+    const candidates = ok.filter((r) => r.type === requestRepo.REQUEST_TYPES.OBJECT_UPDATE)
+
+    const removed: { id: number; sig: string; objectId: number }[] = []
+    const skipped: { id: number; sig: string; objectId: number; reason: string }[] = []
+
+    for (const item of candidates) {
+      const c = item.details as Record<string, unknown> | null
+      if (!c || typeof c !== 'object') continue
+      const objectId = c.objectId != null ? Number(c.objectId) : NaN
+      if (!Number.isInteger(objectId) || objectId < 1) continue
+
+      // We need the raw content for full field values — re-fetch by sig
+      const full = await requestRepo.getRequestBySig(item.sig)
+      if (!full) continue
+      const fc = full.content as Record<string, unknown>
+      const longitude = Number(fc.longitude)
+      const latitude = Number(fc.latitude)
+      const orientation = Number(fc.orientation ?? 0)
+      const offset = fc.offset != null && fc.offset !== '' ? Number(fc.offset) : null
+      const modelId = fc.modelId != null ? Number(fc.modelId) : 0
+
+      const existing = await objectRepo.findById(objectId)
+      if (!existing) {
+        skipped.push({ id: item.id, sig: item.sig, objectId, reason: 'object not found' })
+        continue
+      }
+
+      const existingOffset = existing.position.offset != null ? Number(existing.position.offset) : null
+      const isUnchanged =
+        Math.abs(Number(existing.position.lon) - longitude) < 1e-7 &&
+        Math.abs(Number(existing.position.lat) - latitude) < 1e-7 &&
+        Math.abs((existing.position.heading ?? 0) - orientation) < 1e-4 &&
+        (existingOffset === null
+          ? offset === null
+          : offset !== null && Math.abs(existingOffset - offset) < 1e-4) &&
+        Number(existing.modelId) === modelId
+
+      if (isUnchanged) {
+        await requestRepo.deleteRequest(item.sig)
+        removed.push({ id: item.id, sig: item.sig, objectId })
+        console.log(`[purge] Removed unchanged OBJECT_UPDATE spr_id=${item.id} sig=${item.sig} objectId=${objectId}`)
+      } else {
+        skipped.push({ id: item.id, sig: item.sig, objectId, reason: 'has changes' })
+      }
+    }
+
+    res.json({
+      removed: removed.length,
+      removedItems: removed,
+      skipped: skipped.length,
+      skippedItems: skipped,
+    })
+  } catch (err) {
+    logDbError(err, 'POST /api/submissions/pending/purge-unchanged')
     res.status(500).json({ error: CLIENT_ERROR_MESSAGE })
   }
 }

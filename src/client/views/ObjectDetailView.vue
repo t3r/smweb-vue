@@ -63,6 +63,7 @@
         <div class="form-actions mt-3">
           <Button label="Submit" icon="pi pi-send" @click="submitUpdateRequest" :disabled="!canSubmitUpdate || hasPendingRequest" :loading="updateSubmitting" />
           <Button label="Cancel" severity="secondary" text @click="showUpdateForm = false" class="ml-2" />
+          <small v-if="!hasPositionChanged && originalPosition" class="no-change-hint">No changes detected — modify at least one field to submit.</small>
         </div>
       </Panel>
     </template>
@@ -139,6 +140,9 @@ const editForm = ref({
   comment: '',
 })
 
+/** Snapshot of the object's position when the update form was last opened. Used for dirty-checking. */
+const originalPosition = ref<{ longitude: number; latitude: number; offset: number | null; heading: number } | null>(null)
+
 const breadcrumbItems = computed(() => [
   { label: 'Objects', to: '/objects' },
   { label: object.value?.description || 'Object', to: null },
@@ -163,7 +167,23 @@ const hasValidEmail = computed(
 
 const canSubmitDelete = computed(() => deleteConfirmMatches.value && hasValidEmail.value)
 
-const canSubmitUpdate = computed(() => hasValidEmail.value)
+/** True when at least one editable position field differs from the original loaded values. */
+const hasPositionChanged = computed(() => {
+  const orig = originalPosition.value
+  if (!orig) return false
+  const COORD_EPS = 1e-7
+  const VAL_EPS = 1e-4
+  const lonChanged = Math.abs(editForm.value.longitude - orig.longitude) > COORD_EPS
+  const latChanged = Math.abs(editForm.value.latitude - orig.latitude) > COORD_EPS
+  const headingChanged = Math.abs(editForm.value.heading - orig.heading) > VAL_EPS
+  const offsetChanged =
+    editForm.value.offset === null
+      ? orig.offset !== null
+      : orig.offset === null || Math.abs(editForm.value.offset - orig.offset) > VAL_EPS
+  return lonChanged || latChanged || headingChanged || offsetChanged
+})
+
+const canSubmitUpdate = computed(() => hasValidEmail.value && hasPositionChanged.value)
 
 const mapUrl = computed(() => {
   const lon = object.value?.position?.lon
@@ -207,11 +227,15 @@ function onUpdateMapPosition(pos: { lat: number; lon: number }) {
 function syncEditFormFromObject() {
   const obj = object.value
   if (!obj?.position) return
-  editForm.value = {
+  const snap = {
     longitude: Number(obj.position.lon) || 0,
     latitude: Number(obj.position.lat) || 0,
     offset: obj.position.offset != null ? Number(obj.position.offset) : null,
     heading: obj.position.heading != null ? Number(obj.position.heading) : 0,
+  }
+  originalPosition.value = snap
+  editForm.value = {
+    ...snap,
     comment: editForm.value.comment,
   }
 }
@@ -363,6 +387,7 @@ watch(needsContactEmail, () => {
 .required { color: var(--p-error-color, #e24c4c); }
 .field small { font-size: 0.75rem; margin-top: 0.15rem; }
 .form-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.no-change-hint { color: var(--p-text-muted-color); font-size: 0.75rem; }
 .update-map-block { max-width: 28rem; }
 .update-map-label { display: block; font-weight: 500; font-size: 0.875rem; color: var(--p-text-color); margin-bottom: 0.35rem; }
 .text-secondary { color: var(--p-text-muted-color); font-size: 0.875rem; }

@@ -53,6 +53,7 @@ router.post(
   submissionsController.submitModelUpdateUpload
 )
 router.get('/pending', requireAuth, requireRole('reviewer'), validatorController.getPending)
+router.post('/pending/purge-unchanged', requireAuth, requireRole('reviewer'), validatorController.purgeUnchangedObjectUpdates)
 router.get('/pending/:sig', requireAuth, requireRole('reviewer'), validatorController.getBySig)
 router.post('/pending/:sig/accept', requireAuth, requireRole('reviewer'), validatorController.accept)
 router.post('/pending/:sig/reject', requireAuth, requireRole('reviewer'), validatorController.reject)
