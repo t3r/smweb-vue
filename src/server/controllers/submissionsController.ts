@@ -108,6 +108,23 @@ export async function submitObjectUpdate(req: Request, res: Response): Promise<v
       res.status(409).json({ error: 'A pending request already exists for this object' })
       return
     }
+    // Reject submissions that are identical to the current database state
+    const existing = await objectRepo.findById(objectId)
+    if (!existing) {
+      res.status(404).json({ error: 'Object not found' })
+      return
+    }
+    const existingOffset = existing.position.offset != null ? Number(existing.position.offset) : null
+    const isSamePosition =
+      Math.abs(Number(existing.position.lon) - longitude) < 1e-7 &&
+      Math.abs(Number(existing.position.lat) - latitude) < 1e-7 &&
+      Math.abs((existing.position.heading ?? 0) - orientation) < 1e-4 &&
+      (existingOffset === null ? offset === null : offset !== null && Math.abs(existingOffset - offset) < 1e-4) &&
+      Number(existing.modelId) === (modelId ?? 0)
+    if (isSamePosition) {
+      res.status(400).json({ error: 'No changes detected: the submitted values are identical to the current object data.' })
+      return
+    }
     const user = req.user as { id?: number } | undefined
     const content: Record<string, unknown> = {
       objectId,
