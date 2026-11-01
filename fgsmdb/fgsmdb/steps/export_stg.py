@@ -44,14 +44,14 @@ def run(db: Database, target: str):
             logger.info("Progress: %d / %d tiles", i, num_tiles)
 
         # Get STG content from the database function
-        stg_rows = db.execute("SELECT fn_DumpStgRows(%s)", (ob_tile,))
+        stg_rows = db.execute("SELECT fn_DumpStgRows(%s) AS stg", (ob_tile,))
 
-        if stg_rows and stg_rows[0][0]:
+        if stg_rows and stg_rows[0]["stg"]:
             parent = os.path.join(target, ob_path)
             os.makedirs(parent, exist_ok=True)
 
             stg_full_path = os.path.join(parent, stg_file)
             with open(stg_full_path, "w") as f:
-                f.write(f"{stg_rows[0][0]}\n")
+                f.write(f"{stg_rows[0]['stg']}\n")
 
     logger.info("STG export complete: %d tiles processed.", num_tiles)
