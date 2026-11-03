@@ -1,4 +1,4 @@
-"""Directory index generation — creates .dirindex files for TerraSync.
+"""Directory index generation — creates .dirindex and dirindex.txt files for TerraSync.
 
 Equivalent to the legacy CreateDirectoryIndexes.py and mkdiridx.sh scripts.
 
@@ -8,6 +8,8 @@ TerraSync .dirindex format:
     f:<filename>:<sha1>:<size>     (regular files)
     t:<filename>:<sha1>:<size>     (tar archives)
     d:<dirname>:<sha1_of_dirindex> (subdirectories)
+
+Both .dirindex and dirindex.txt are written with identical content.
 """
 
 import hashlib
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 DIRINDEX_VERSION = 1
 DIRINDEX_FILENAME = ".dirindex"
+DIRINDEX_TXT_FILENAME = "dirindex.txt"
 
 
 def sha1_of_file(path: str) -> str:
@@ -34,8 +37,22 @@ def sha1_of_file(path: str) -> str:
     return h.hexdigest()
 
 
+def _write_dirindex(directory: str, content: str):
+    """Write .dirindex and dirindex.txt with identical content.
+
+    Returns the SHA1 hash of the written .dirindex file.
+    """
+    dirindex_path = os.path.join(directory, DIRINDEX_FILENAME)
+    txt_path = os.path.join(directory, DIRINDEX_TXT_FILENAME)
+    with open(dirindex_path, "w") as f:
+        f.write(content)
+    with open(txt_path, "w") as f:
+        f.write(content)
+    return sha1_of_file(dirindex_path)
+
+
 def create_dirindex(path: str, parent: str = "") -> str:
-    """Recursively create .dirindex files in a directory tree.
+    """Recursively create .dirindex and dirindex.txt files in a directory tree.
 
     Args:
         path: Absolute or relative path to the directory.
@@ -44,34 +61,29 @@ def create_dirindex(path: str, parent: str = "") -> str:
     Returns:
         SHA1 hash of the generated .dirindex file.
     """
-    dirindex_path = os.path.join(path, DIRINDEX_FILENAME)
+    lines = [
+        f"version:{DIRINDEX_VERSION}",
+        f"path:{parent}",
+    ]
 
-    entries = sorted(os.listdir(path))
+    for entry in sorted(os.listdir(path)):
+        full_path = os.path.join(path, entry)
 
-    with open(dirindex_path, "w") as f:
-        f.write(f"version:{DIRINDEX_VERSION}\n")
-        f.write(f"path:{parent}\n")
+        if entry in (DIRINDEX_FILENAME, DIRINDEX_TXT_FILENAME):
+            continue
 
-        for entry in entries:
-            full_path = os.path.join(path, entry)
+        if os.path.isfile(full_path):
+            file_hash = sha1_of_file(full_path)
+            file_size = os.stat(full_path).st_size
+            prefix = "t" if entry.endswith(".tgz") or entry.endswith(".txz") else "f"
+            lines.append(f"{prefix}:{entry}:{file_hash}:{file_size}")
 
-            if entry == DIRINDEX_FILENAME:
-                continue
+        elif os.path.isdir(full_path) and entry != ".svn":
+            child_parent = os.path.join(parent, entry) if parent else entry
+            child_hash = create_dirindex(full_path, child_parent)
+            lines.append(f"d:{entry}:{child_hash}")
 
-            if os.path.isfile(full_path):
-                file_hash = sha1_of_file(full_path)
-                file_size = os.stat(full_path).st_size
-                if entry.endswith(".tgz") or entry.endswith(".txz"):
-                    f.write(f"t:{entry}:{file_hash}:{file_size}\n")
-                else:
-                    f.write(f"f:{entry}:{file_hash}:{file_size}\n")
-
-            elif os.path.isdir(full_path) and entry != ".svn":
-                child_parent = os.path.join(parent, entry) if parent else entry
-                child_hash = create_dirindex(full_path, child_parent)
-                f.write(f"d:{entry}:{child_hash}\n")
-
-    return sha1_of_file(dirindex_path)
+    return _write_dirindex(path, "\n".join(lines) + "\n")
 
 
 def create_root_dirindex(fg_scenery: str, fg_scenery_export: str):
@@ -113,37 +125,39 @@ def create_root_dirindex(fg_scenery: str, fg_scenery_export: str):
 
     # Build the root .dirindex
     logger.info("Creating root .dirindex...")
-    root_dirindex_path = os.path.join(fg_scenery_export, DIRINDEX_FILENAME)
-    with open(root_dirindex_path, "w") as f:
-        f.write(f"version:{DIRINDEX_VERSION}\n")
-        f.write("path:\n")
-        f.write(f"time:{datetime.now(timezone.utc).strftime('%Y%m%d-%H:%MZ')}\n")
 
-        # Airports (from remote scenery)
-        airports_dirindex = os.path.join(airports_path, DIRINDEX_FILENAME)
-        if os.path.isfile(airports_dirindex):
-            f.write(f"d:Airports:{sha1_of_file(airports_dirindex)}\n")
+    lines = [
+        f"version:{DIRINDEX_VERSION}",
+        "path:",
+        f"time:{datetime.now(timezone.utc).strftime('%Y%m%d-%H:%MZ')}",
+    ]
 
-        # Models (from export)
-        models_dirindex = os.path.join(models_path, DIRINDEX_FILENAME)
-        if os.path.isfile(models_dirindex):
-            f.write(f"d:Models:{sha1_of_file(models_dirindex)}\n")
+    # Airports (from remote scenery)
+    airports_dirindex = os.path.join(airports_path, DIRINDEX_FILENAME)
+    if os.path.isfile(airports_dirindex):
+        lines.append(f"d:Airports:{sha1_of_file(airports_dirindex)}")
 
-        # Objects (from export)
-        objects_dirindex = os.path.join(objects_path, DIRINDEX_FILENAME)
-        if os.path.isfile(objects_dirindex):
-            f.write(f"d:Objects:{sha1_of_file(objects_dirindex)}\n")
+    # Models (from export)
+    models_dirindex = os.path.join(models_path, DIRINDEX_FILENAME)
+    if os.path.isfile(models_dirindex):
+        lines.append(f"d:Models:{sha1_of_file(models_dirindex)}")
 
-        # Terrain (from remote scenery)
-        terrain_dirindex = os.path.join(fg_scenery, "Terrain", DIRINDEX_FILENAME)
-        if os.path.isfile(terrain_dirindex):
-            f.write(f"d:Terrain:{sha1_of_file(terrain_dirindex)}\n")
+    # Objects (from export)
+    objects_dirindex = os.path.join(objects_path, DIRINDEX_FILENAME)
+    if os.path.isfile(objects_dirindex):
+        lines.append(f"d:Objects:{sha1_of_file(objects_dirindex)}")
 
-        # Airports archive tarball (staged in export dir, synced to fg_scenery by upload step)
-        archive_path = os.path.join(fg_scenery_export, "Airports_archive.tgz")
-        if os.path.isfile(archive_path):
-            archive_hash = sha1_of_file(archive_path)
-            archive_size = os.stat(archive_path).st_size
-            f.write(f"t:Airports_archive.tgz:{archive_hash}:{archive_size}\n")
+    # Terrain (from remote scenery)
+    terrain_dirindex = os.path.join(fg_scenery, "Terrain", DIRINDEX_FILENAME)
+    if os.path.isfile(terrain_dirindex):
+        lines.append(f"d:Terrain:{sha1_of_file(terrain_dirindex)}")
 
-    logger.info("Root .dirindex created at %s", root_dirindex_path)
+    # Airports archive tarball (staged in export dir, synced to fg_scenery by upload step)
+    archive_path = os.path.join(fg_scenery_export, "Airports_archive.tgz")
+    if os.path.isfile(archive_path):
+        archive_hash = sha1_of_file(archive_path)
+        archive_size = os.stat(archive_path).st_size
+        lines.append(f"t:Airports_archive.tgz:{archive_hash}:{archive_size}")
+
+    _write_dirindex(fg_scenery_export, "\n".join(lines) + "\n")
+    logger.info("Root .dirindex created at %s", fg_scenery_export)
