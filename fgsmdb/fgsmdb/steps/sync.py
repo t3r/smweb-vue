@@ -12,6 +12,7 @@ import shutil
 logger = logging.getLogger(__name__)
 
 DIRINDEX_FILENAME = ".dirindex"
+DIRINDEX_TXT_FILENAME = "dirindex.txt"
 
 
 def sha1_of_file(path: str) -> str:
@@ -105,6 +106,7 @@ def sync_path(src: str, dst: str, expected_hash: str | None = None) -> str | Non
             _copy_file(file_entry["name"], src, dst)
             logger.debug("copy (new) %s : %s -> %s", file_entry["name"], src, dst)
         _copy_file(DIRINDEX_FILENAME, src, dst)
+        _sync_dirindex_txt(src, dst)
     else:
         # Have destination .dirindex — do incremental sync
         dst_index = DirIndex(dst_dirindex_path)
@@ -116,9 +118,10 @@ def sync_path(src: str, dst: str, expected_hash: str | None = None) -> str | Non
                 _copy_file(src_file["name"], src, dst)
                 logger.debug("copy (changed) %s : %s -> %s", src_file["name"], src, dst)
 
-        # Update .dirindex if hashes differ
+        # Update .dirindex and dirindex.txt if hashes differ
         if expected_hash != sha1_of_file(dst_dirindex_path):
             _copy_file(DIRINDEX_FILENAME, src, dst)
+            _sync_dirindex_txt(src, dst)
 
         # Remove files that no longer exist in source
         for dst_file in dst_index.files:
@@ -136,6 +139,23 @@ def _copy_file(name: str, src_dir: str, dst_dir: str):
     src_path = os.path.join(src_dir, name)
     dst_path = os.path.join(dst_dir, name)
     shutil.copy2(src_path, dst_path)
+
+
+def _sync_dirindex_txt(src_dir: str, dst_dir: str):
+    """Copy dirindex.txt from src to dst if missing or changed.
+
+    dirindex.txt has the same content as .dirindex but is not listed inside
+    .dirindex itself, so it must be handled separately here rather than via
+    the normal file-entry sync loop.
+    """
+    src_path = os.path.join(src_dir, DIRINDEX_TXT_FILENAME)
+    if not os.path.isfile(src_path):
+        return
+    dst_path = os.path.join(dst_dir, DIRINDEX_TXT_FILENAME)
+    src_hash = sha1_of_file(src_path)
+    if not os.path.isfile(dst_path) or sha1_of_file(dst_path) != src_hash:
+        shutil.copy2(src_path, dst_path)
+        logger.debug("copy dirindex.txt : %s -> %s", src_dir, dst_dir)
 
 
 def run(fg_scenery_export: str, fg_scenery: str):
