@@ -106,7 +106,6 @@ def sync_path(src: str, dst: str, expected_hash: str | None = None) -> str | Non
             _copy_file(file_entry["name"], src, dst)
             logger.debug("copy (new) %s : %s -> %s", file_entry["name"], src, dst)
         _copy_file(DIRINDEX_FILENAME, src, dst)
-        _sync_dirindex_txt(src, dst)
     else:
         # Have destination .dirindex — do incremental sync
         dst_index = DirIndex(dst_dirindex_path)
@@ -118,10 +117,9 @@ def sync_path(src: str, dst: str, expected_hash: str | None = None) -> str | Non
                 _copy_file(src_file["name"], src, dst)
                 logger.debug("copy (changed) %s : %s -> %s", src_file["name"], src, dst)
 
-        # Update .dirindex and dirindex.txt if hashes differ
+        # Update .dirindex if hashes differ
         if expected_hash != sha1_of_file(dst_dirindex_path):
             _copy_file(DIRINDEX_FILENAME, src, dst)
-            _sync_dirindex_txt(src, dst)
 
         # Remove files that no longer exist in source
         for dst_file in dst_index.files:
@@ -130,6 +128,10 @@ def sync_path(src: str, dst: str, expected_hash: str | None = None) -> str | Non
                 if os.path.exists(dst_file_path):
                     os.remove(dst_file_path)
                     logger.debug("delete %s", dst_file_path)
+
+    # Always sync dirindex.txt — it mirrors .dirindex content and must be
+    # present regardless of whether .dirindex itself changed this run.
+    _sync_dirindex_txt(src, dst)
 
     return expected_hash
 

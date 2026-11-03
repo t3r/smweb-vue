@@ -56,8 +56,11 @@ def run(fg_scenery: str, sync_targets: list[str], cdn_invalidate_cmd: str = ""):
         return
 
     scenery_items = ["Objects", "Models", "Airports", ".dirindex", "Airports_archive.tgz"]
-    if os.path.isfile(os.path.join(fg_scenery, "dirindex.txt")):
+    dirindex_txt = os.path.join(fg_scenery, "dirindex.txt")
+    if os.path.isfile(dirindex_txt):
         scenery_items.append("dirindex.txt")
+    else:
+        logger.warning("dirindex.txt not found in %s — skipping from rsync. Run mkdiridx first.", fg_scenery)
     tarball = "SharedModels.txz"
 
     with ThreadPoolExecutor(max_workers=len(sync_targets) * 2) as executor:
