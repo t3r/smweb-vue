@@ -1002,7 +1002,7 @@ async function fetchForViewport() {
     if (data.objects != null) {
       clearGridSource()
       const features = objectsToFeatures(data.objects)
-      clusterIndex = new Supercluster({ radius: 50, maxZoom: 18 })
+      clusterIndex = new Supercluster({ radius: 50, maxZoom: 19 })
       clusterIndex.load(features)
       updateClustersDisplay()
     } else if (data.grid) {
