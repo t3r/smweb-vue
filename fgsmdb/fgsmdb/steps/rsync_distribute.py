@@ -56,6 +56,8 @@ def run(fg_scenery: str, sync_targets: list[str], cdn_invalidate_cmd: str = ""):
         return
 
     scenery_items = ["Objects", "Models", "Airports", ".dirindex", "Airports_archive.tgz"]
+    if os.path.isfile(os.path.join(fg_scenery, "dirindex.txt")):
+        scenery_items.append("dirindex.txt")
     tarball = "SharedModels.txz"
 
     with ThreadPoolExecutor(max_workers=len(sync_targets) * 2) as executor:
