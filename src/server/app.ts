@@ -153,6 +153,15 @@ if (isProduction) {
         index: false,
         maxAge: '1d',
         immutable: false,
+        setHeaders(res, filePath) {
+          // Ensure .mjs files are served with the correct MIME type.
+          // Required for maplibre-gl's web worker (maplibre-gl-worker.mjs)
+          // and any other ES module worker files — browsers enforce strict
+          // MIME type checking for module scripts.
+          if (filePath.endsWith('.mjs')) {
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+          }
+        },
       })
     )
     /** Hosts that serve the built SPA from this process (typical behind a reverse proxy). */
