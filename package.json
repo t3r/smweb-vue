@@ -74,6 +74,7 @@
     "tsx": "^4.23.15",
     "typescript": "~7.0.2",
     "vite": "^8.3.5",
+    "vite-plugin-static-copy": "^2.3.2",
     "vitest": "^5.0.5",
     "vue-tsc": "^3.3.13"
   }
