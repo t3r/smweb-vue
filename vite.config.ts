@@ -1,7 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { viteStaticCopy } from 'vite-plugin-static-copy'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
@@ -95,21 +94,7 @@ export default defineConfig({
     __FGS_GIT_SLUG__: JSON.stringify(appGitSlug),
     __FGS_REPO_WEB_URL__: JSON.stringify(appRepoWebUrl),
   },
-  plugins: [
-    vue(),
-    devStrictHtmlFallback(),
-    // maplibre-gl v6 loads its web worker as a separate ES module at runtime.
-    // Vite does not bundle it automatically — copy it to assets so it is
-    // available at the URL maplibre-gl constructs from its own package path.
-    viteStaticCopy({
-      targets: [
-        {
-          src: resolve(projectRoot, 'node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs'),
-          dest: 'assets',
-        },
-      ],
-    }),
-  ],
+  plugins: [vue(), devStrictHtmlFallback()],
   root: 'src/client',
   server: {
     port: 5173,

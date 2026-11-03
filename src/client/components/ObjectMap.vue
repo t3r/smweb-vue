@@ -96,6 +96,10 @@ import InputText from 'primevue/inputtext'
 import { useAppToast } from '@/composables/useAppToast'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+// Vite's ?url suffix emits the worker as a properly hashed asset and returns
+// its URL. setWorkerUrl() must be called before any Map is instantiated.
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 import Supercluster from 'supercluster'
 import { fgTileGridFeatureCollection, fgTileIndex } from '@/utils/fgSceneryTileGrid'
 
