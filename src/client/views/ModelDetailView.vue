@@ -11,7 +11,7 @@
 
       <Tag v-if="hasPendingRequest" severity="info" icon="pi pi-inbox" class="mb-3">Pending request</Tag>
 
-      <div class="button-bar mb-3">
+      <div v-if="auth.isAuthenticated" class="button-bar mb-3">
         <router-link v-slot="{ navigate }" :to="`/models/${model.id}/edit`" custom>
           <Button label="Update" icon="pi pi-pencil" :disabled="hasPendingRequest" @click="navigate" />
         </router-link>
@@ -24,7 +24,7 @@
         />
       </div>
       <p
-        v-if="deleteModelBlockedByObjects"
+        v-if="auth.isAuthenticated && deleteModelBlockedByObjects"
         class="text-secondary text-sm m-0 mb-2"
       >
         Delete is only available when no object placements use this model. Remove those objects first.

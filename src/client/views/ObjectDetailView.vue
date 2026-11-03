@@ -12,14 +12,14 @@
       <h1 class="mt-0">{{ object.description || 'Object' }}</h1>
       <Tag v-if="hasPendingRequest" severity="info" icon="pi pi-inbox" class="mb-3">Pending request</Tag>
 
-      <div class="button-bar mb-3">
+      <div v-if="auth.isAuthenticated" class="button-bar mb-3">
         <Button label="Update" icon="pi pi-pencil" :disabled="hasPendingRequest" @click="showUpdateForm = true" />
         <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="hasPendingRequest" @click="openDeleteDialog" />
       </div>
 
       <ObjectDetailsCard :object="object" :countries="countries" />
 
-      <Panel v-if="showUpdateForm" class="mt-4" header="Submit update request">
+      <Panel v-if="auth.isAuthenticated && showUpdateForm" class="mt-4" header="Submit update request">
         <p class="text-secondary mb-3">Change the values below and submit to queue an update for review. Only longitude, latitude, elevation offset and heading are editable here.</p>
         <div class="update-map-block mb-3">
           <span class="update-map-label">Drag the marker to set latitude and longitude</span>
