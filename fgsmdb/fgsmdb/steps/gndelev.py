@@ -85,6 +85,12 @@ def run(
                     logger.warning("No elevation result for ob_id=%s, skipping.", ob_id)
                     continue
 
+                if elevation == -9999.0:
+                    # fgelev uses -9999 to signal no terrain coverage (ocean, missing tile).
+                    # Use 0 so the object is no longer treated as pending.
+                    logger.debug("ob_id=%s has no terrain coverage, setting elevation to 0.", ob_id)
+                    elevation = 0.0
+
                 db.execute(
                     "UPDATE fgs_objects SET ob_gndelev = %s WHERE ob_id = %s AND ob_gndelev = -9999",
                     (elevation, ob_id),
