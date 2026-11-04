@@ -178,6 +178,6 @@ def _create_shared_models_tarball(fg_scenery: str):
         return
 
     logger.info("Creating SharedModels.txz...")
-    with tarfile.open(output_path, "w:xz") as tar:
+    with tarfile.open(output_path, "w:xz", dereference=True) as tar:
         tar.add(models_path, arcname="Models")
     logger.info("SharedModels.txz created at %s", output_path)

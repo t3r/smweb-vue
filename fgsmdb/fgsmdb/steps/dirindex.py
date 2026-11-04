@@ -109,7 +109,7 @@ def create_root_dirindex(fg_scenery: str, fg_scenery_export: str):
         # and Models.
         archive_path = os.path.join(fg_scenery_export, "Airports_archive.tgz")
         logger.info("Creating Airports_archive.tgz...")
-        with tarfile.open(archive_path, "w:gz") as tar:
+        with tarfile.open(archive_path, "w:gz", dereference=True) as tar:
             tar.add(airports_path, arcname="Airports")
 
     # Create Objects and Models dirindexes in the export directory
